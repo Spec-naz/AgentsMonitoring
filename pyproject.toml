@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agents-monitoring"
-version = "0.3.12"
+version = "0.4.0.dev1"
 description = "Keep your AI coding agents (Claude Code, Codex, …) alive in tmux and watch their status — dependency-free."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,4 +23,4 @@ agentsmon = "agentsmon.__main__:main"
 packages = ["agentsmon"]
 
 [tool.setuptools.package-data]
-agentsmon = ["static/*.js", "core-manifest.json"]
+agentsmon = ["static/*.js", "static/*.css", "core-manifest.json"]

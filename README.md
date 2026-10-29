@@ -380,3 +380,15 @@ stored as SHA-256 hashes. Restart commands and trusted plugins run as your user.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+
+### Mission Control preview (0.4.0.dev1)
+
+The dashboard now uses responsive agent cards with full names and a dedicated Telegram link.
+Use **Light mode / Dark mode** to save a theme on this browser. Open **Connection details**
+for the session identifier or port. Native process counts do not prove task progress or
+Telegram delivery. A stale snapshot banner means the displayed values are historical; it
+does not mean the agents stopped. The receipt time describes the browser snapshot, not
+the timestamp of every provider measurement.
+
+See [preview validation and rollback](docs/mission-control-preview.md).

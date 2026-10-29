@@ -78,7 +78,8 @@ async def verify(args):
                 card=page.locator('#services section').first
                 # A module can opt into visible metrics without changing stable row identities.
                 assert await card.locator('.rows-value-label').text_content()=='Detail'
-                assert '42 notes' in await card.locator('tbody').inner_text()
+                await page.screenshot(path=str(args.out/'initial.png'),full_page=True)
+                assert '42 notes' in await card.locator('tbody').inner_text(), (await card.inner_html(), errors)
                 assert await card.locator('img').count()==0
                 assert await page.evaluate('window.PWNED || null') is None
                 await card.screenshot(path=str(args.out/'service-details.png'))
@@ -90,10 +91,10 @@ async def verify(args):
                 await page.wait_for_timeout(350)
                 daemon_status=upper.locator('tbody tr').nth(1).locator('td').nth(4)
                 await page.screenshot(path=str(args.out/'daemon-status.png'),full_page=True)
-                assert await daemon_status.inner_text()=='Running',await daemon_status.inner_text()
+                assert await daemon_status.inner_text()=='Process running',await daemon_status.inner_text()
                 assert 'latency 1 ms' in await daemon_status.get_attribute('title')
                 assert 'Health endpoint OK' in await daemon_status.get_attribute('title')
-                assert await upper.locator('tbody tr').first.locator('td').nth(4).inner_text()=='Running'
+                assert await upper.locator('tbody tr').first.locator('td').nth(4).inner_text()=='Process running'
                 # A live login gate must be yellow; liveness still prevents keeper restarts.
                 shared.update(needs_login=True, status='Needs login')
                 await page.evaluate('refresh()')
@@ -112,7 +113,7 @@ async def verify(args):
                 for latency,expected in ((0,'latency <1 ms'),(None,None)):
                     daemon['latency_ms']=latency
                     await page.evaluate('refresh()')
-                    assert await daemon_status.inner_text()=='Running'
+                    assert await daemon_status.inner_text()=='Process running'
                     tooltip=await daemon_status.get_attribute('title')
                     if expected:
                         assert expected in tooltip,tooltip
@@ -123,7 +124,7 @@ async def verify(args):
                 for status in (None,'Down','Timeout','Error'):
                     daemon['status']=status
                     await page.evaluate('refresh()')
-                    assert await daemon_status.inner_text()==(status or 'Idle')
+                    assert await daemon_status.inner_text()==(status or 'Process stopped')
                     assert await daemon_status.locator('.bg-emerald-500').count()==0
                     assert 'Health endpoint failed' in await daemon_status.get_attribute('title')
                 await page.wait_for_timeout(350)
@@ -136,7 +137,9 @@ async def verify(args):
                 await page.evaluate('refresh()')
                 await page.wait_for_timeout(350)
                 same(await geometry(upper),await geometry(lower))
-                assert await upper.locator('thead').inner_text()==await lower.locator('thead').inner_text()
+                assert await upper.locator('thead').text_content()==await lower.locator('thead').text_content()
+                await lower.locator('summary').click()
+                await upper.locator('tbody tr').first.locator('summary').click()
                 assert sid in await lower.inner_text()
                 assert await lower.locator('[title="Account: Fixture account"]').count()==1
                 assert await lower.locator('a[href="https://t.me/example_test_bot"]').count()==1
@@ -180,7 +183,7 @@ async def verify(args):
                 assert 'bg-rose-500' in await lower.locator('.svc-dot').get_attribute('class')
                 assert 'Plugin timed out' in await page.locator('#plugin-errors').inner_text()
                 assert await page.locator('#plugin-errors .bg-rose-50').count()==1
-                assert 'Running' in await upper.inner_text()
+                assert 'Process running' in await upper.inner_text()
                 extension['name']='<img src=x onerror="window.PWNED=1">'
                 await page.evaluate('refresh()')
                 assert await lower.locator('img').count()==0
@@ -197,7 +200,7 @@ async def verify(args):
                 assert await page.locator('#plugin-errors').inner_text()==''
                 assert await page.locator('#plugin-tables [data-act]').count()==0
                 assert await page.locator('#plugin-tables section').count()==0
-                assert 'Running' in await upper.inner_text()
+                assert 'Process running' in await upper.inner_text()
                 await page.wait_for_timeout(350)
                 await page.screenshot(path=str(args.out/'plugin-loading.png'),full_page=True)
                 # A real failure still renders red after the neutral state.
@@ -236,13 +239,13 @@ async def verify(args):
                     await page.evaluate('refresh()');await page.wait_for_timeout(350)
                     await page.screenshot(path=str(args.out/'private-plugin.png'),full_page=True)
                 assert not errors,errors
-                print('PASS: daemon Running/latency tooltip, unhealthy statuses, shared columns/layout, reference geometry, usage, action routing, error isolation, neutral plugin loading without stale actions, red timeouts, HTML escaping, observed uptime.')
+                print('PASS: process status/latency tooltip, unhealthy statuses, shared columns/layout, reference geometry, usage, action routing, error isolation, neutral plugin loading without stale actions, red timeouts, HTML escaping, observed uptime.')
             finally: await browser.close()
     finally: server.shutdown();server.server_close();thread.join(2)
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--browser',required=True)
+    parser=argparse.ArgumentParser();parser.add_argument('--browser',default=None)
     parser.add_argument('--out',required=True,type=Path);parser.add_argument('--reference-page',type=Path)
     parser.add_argument('--private-state',type=Path,help='Optional already sanitized plugin result, never checked into this repo')
     asyncio.run(verify(parser.parse_args()))

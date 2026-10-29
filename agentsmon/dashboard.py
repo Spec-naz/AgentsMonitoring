@@ -78,15 +78,31 @@ AGENT_TABLE = r"""
   </section>"""
 
 
+_MISSION_CSS = (Path(__file__).parent / "static" / "dashboard.css").read_text("utf-8")
+
 PAGE = r"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agents Monitoring</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 <script src="/static/tailwind.js"></script>
 <style>.bar{transition:opacity .15s ease}.bar:hover{opacity:.65}.copied-flash{color:#059669!important;transition:color .1s}#toast{transition:opacity .2s ease}.agent-rows td{overflow:hidden}.sid{display:block;overflow:hidden;text-overflow:ellipsis}</style>
+<style>MISSION_CSS</style>
 </head><body class="bg-slate-50 text-slate-800 antialiased">
 <div id="toast" class="fixed left-1/2 bottom-5 -translate-x-1/2 bg-slate-800 text-white text-sm px-2 py-1.5 rounded-md shadow-lg opacity-0 pointer-events-none" style="z-index:50">&nbsp;</div>
-<div id="app" class="mx-auto px-5 py-6" style="max-width:850px">
+<div id="app" class="mx-auto px-5 py-6" style="max-width:1200px">
+  <header class="mission-head">
+    <div><p class="eyebrow">AGENTS / OBSERVABILITY</p><h1>Mission control<span class="title-dot">.</span></h1>
+    <p class="mission-sub">Your agents. One clear signal.</p></div>
+    <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
+  </header>
+  <div id="connection-state" role="status" aria-live="off" class="connection-state">Connecting · waiting for first snapshot</div>
+  <span id="connection-announcement" class="sr-only" role="status" aria-live="polite"></span>
+  <div class="mission-metrics" aria-label="Native agent process overview">
+    <div><span>Agents observed</span><strong id="metric-agents">—</strong></div>
+    <div><span>Tmux processes up</span><strong id="metric-running">—</strong></div>
+    <div><span>Need attention</span><strong id="metric-attention">—</strong></div>
+  </div>
+  <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
 AGENT_TABLES
   <div id="services"></div>
   <p class="text-center text-[11px] text-slate-300" id="footer">auto-refresh</p>
@@ -151,6 +167,36 @@ AGENT_TABLES
 </template>
 
 <script>
+function applyTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  const btn=document.getElementById("theme-toggle");
+  btn.textContent=theme==="dark"?"Light mode":"Dark mode";
+  btn.setAttribute("aria-label", "Switch to "+(theme==="dark"?"light":"dark")+" theme");
+}
+let savedTheme="dark";
+try{savedTheme=localStorage.getItem("agentsmon.theme")||"dark";}catch(e){}
+applyTheme(savedTheme==="light"?"light":"dark");
+document.getElementById("theme-toggle").addEventListener("click",()=>{
+  const theme=document.documentElement.dataset.theme==="dark"?"light":"dark";
+  applyTheme(theme);try{localStorage.setItem("agentsmon.theme",theme);}catch(e){}
+});
+let lastSnapshot=0, refreshBusy=false, connectionFailed=false, announcedConnection=null;
+const staleAfter=Math.max(30, Number(POLL)*3)*1000;
+const requestTimeoutMs=Number("REQUEST_TIMEOUT")*1000||120000;
+function updateConnection(){
+  const failed=connectionFailed;
+  const age=lastSnapshot?Math.max(0,Math.floor((Date.now()-lastSnapshot)/1000)):null;
+  const stale=failed||!lastSnapshot||Date.now()-lastSnapshot>staleAfter;
+  document.getElementById("app").dataset.stale=stale?"true":"false";
+  const el=document.getElementById("connection-state");
+  el.dataset.state=stale?"stale":"fresh";
+  if(announcedConnection!==stale&&(lastSnapshot||connectionFailed)){
+    document.getElementById("connection-announcement").textContent=stale?"Dashboard data unavailable or stale":"Dashboard snapshot received";
+    announcedConnection=stale;
+  }
+  el.textContent=stale?(lastSnapshot?`Snapshot stale · last received ${age}s ago${failed?" · connection failed":""}`:"No snapshot available · connecting or retrying"):`Snapshot received ${age}s ago · refresh every ${POLL}s`;
+}
+setInterval(()=>updateConnection(),1000);
 const STATE = {
   operational: ["bg-emerald-500", "Operational", "text-emerald-600", "bg-emerald-50 border-emerald-200"],
   outage:      ["bg-rose-500", "Outage", "text-rose-600", "bg-rose-50 border-rose-200"],
@@ -248,18 +294,21 @@ function renderActions(a,table){
     stopped?{id:"stop",label:"Remove "+a.name,icon:"stop",confirm:`Remove agent "${a.name}" from Agents Monitoring? Its conversation files stay on disk.`}
            :{id:"stop",label:"Stop "+a.name,icon:"stop"}]);
   const paths={restart:'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',stop:'M18 6 6 18M6 6l12 12',run:'M8 5l11 7-11 7z'};
-  const buttons=defs.map(x=>`<button class="agent-act inline-flex align-middle p-1 rounded text-slate-400 ${x.icon==='stop'?'ml-0.5 hover:text-rose-600 hover:bg-rose-50':'hover:text-sky-600 hover:bg-slate-100'}" data-act="${esc(x.id)}" data-name="${esc(a.name)}" ${a.plugin?`data-table="${esc(table)}" data-row="${esc(a.id)}"`:''} data-confirm="${esc(x.confirm||'')}" title="${esc(x.label)}"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[x.icon]||paths.run}"/></svg></button>`).join("");
+  const buttons=defs.map(x=>`<button class="agent-act inline-flex align-middle p-1 rounded text-slate-400 ${x.icon==='stop'?'ml-0.5 hover:text-rose-600 hover:bg-rose-50':'hover:text-sky-600 hover:bg-slate-100'}" data-act="${esc(x.id)}" data-name="${esc(a.name)}" ${a.plugin?`data-table="${esc(table)}" data-row="${esc(a.id)}"`:''} data-confirm="${esc(x.confirm||'')}" aria-label="${esc(x.label)}" title="${esc(x.label)}"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[x.icon]||paths.run}"/></svg></button>`).join("");
   return buttons+((a.actions===false||a.actions_locked)?'<span class="text-xs text-slate-300 ml-0.5 align-middle" title="Actions controlled by the provider">🔒</span>':'');
 }
+const previousAgentSignals=new WeakMap();
 function renderAgents(root, agents, summary=null, columns=[]){
   renderColumns(root, columns);
+  const priorSignals=previousAgentSignals.get(root)||new Map(), nextSignals=new Map();
+  previousAgentSignals.set(root,nextSignals);
   const tb=q(root,".agent-rows");
   const on=agents.some(a=>a.alive&&!a.needs_login); const running=agents.filter(a=>a.alive&&!a.needs_login).length;
   q(root,".svc-head").className="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 cursor-pointer "+(on?"bg-emerald-50 border-emerald-200":"bg-white border-slate-200");
   q(root,".svc-dot").className="svc-dot h-3 w-3 rounded-full shrink-0 "+(on?"bg-emerald-500":"bg-slate-300");
   const cnt=q(root,".agents-count");
-  // Use the same health summary for every provider's table.
-  cnt.textContent=`${running}/${agents.length} healthy`;
+  // Native liveness is a process observation, not end-to-end health.
+  cnt.textContent=`${running}/${agents.length} available`;
   cnt.className="agents-count ml-auto text-sm font-medium "+(agents.length&&running===agents.length?"text-emerald-600":running?"text-amber-600":"text-slate-400");
   if(summary){
     const state=summary.up?STATE.operational:(summary.rows.length||summary.error?STATE.outage:STATE.nodata);
@@ -270,6 +319,11 @@ function renderAgents(root, agents, summary=null, columns=[]){
     q(root,".agents-note").textContent=summary.error||summary.note||"";
   }
   if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;return;}
+  const openDetails=new Set([...tb.querySelectorAll("tr[data-agent] details[open]")].map(el=>el.closest("tr").dataset.agent));
+  const focused=document.activeElement;
+  const focusedRow=focused&&tb.contains(focused)?focused.closest("tr[data-agent]"):null;
+  const focusState=focusedRow?{agent:focusedRow.dataset.agent,act:focused.dataset.act,
+    selector:focused.matches(".agent-act")?".agent-act":focused.matches(".agent-name")?".agent-name":focused.matches("summary")?"summary":focused.matches(".sid")?".sid":focused.matches(".telegram-link")?".telegram-link":null}:null;
   tb.innerHTML="";
   agents.forEach(a=>{
     const tcls=VENDOR[a.vendor]||"bg-slate-100 text-slate-600";
@@ -277,20 +331,26 @@ function renderAgents(root, agents, summary=null, columns=[]){
     const tip=copy?`${copy} (click to copy)`:"no resume";
     let sid;
     if(a.session_id){
-      sid=`<span class="sid font-mono text-xs text-slate-600 whitespace-nowrap cursor-pointer hover:text-sky-600" title="${esc(tip)}" data-copy="${esc(copy)}">${esc(a.session_id)}</span>`;
+      sid=`<span tabindex="0" role="button" class="sid font-mono text-xs text-slate-600 whitespace-nowrap cursor-pointer hover:text-sky-600" title="${esc(tip)}" data-copy="${esc(copy)}">${esc(a.session_id)}</span>`;
     }else if(a.kind==="daemon" && a.port){
       // Daemons (gateways) have no session id — show the port they actually listen on instead.
-      sid=`<span class="font-mono text-xs text-slate-500 whitespace-nowrap" title="gateway port">:${a.port}</span>`;
+      sid=`<span class="font-mono text-xs text-slate-500 whitespace-nowrap" title="gateway port">:${esc(a.port)}</span>`;
     }else{
       sid=`<span class="text-xs text-slate-300 cursor-help" title="${esc(tip)}">— none</span>`;
     }
     const ok=a.alive&&!a.needs_login; const dot=a.needs_login?"bg-amber-500":(ok?"bg-emerald-500":(a.plugin?"bg-rose-500":"bg-slate-300"));
     // Health is the visible status for every agent; latency is supplementary detail.
-    const statusTxt=a.status||(ok?"Running":"Idle");
+    const fallbackStatus=a.needs_login?"Login required":a.plugin?(ok?"Available":"Unavailable"):
+      a.kind==="daemon"&&a.health_url?(ok?"Endpoint responding":"Endpoint unavailable"):(ok?"Process running":"Process stopped");
+    const statusTxt=(!a.plugin&&a.status==="Running"?fallbackStatus:a.status)||fallbackStatus;
     const statusTip=[a.status_detail||a.status,
       ok&&a.latency_ms!=null?`latency ${fmtLat(a.latency_ms)}`:""].filter(Boolean).join(" · ");
     const stCls=a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
-    const tr=document.createElement("tr"); tr.className="border-b border-slate-100 last:border-0";
+    const tr=document.createElement("tr"); tr.dataset.agent=a.id||a.name; tr.className="border-b border-slate-100 last:border-0";
+    const signalKey=tr.dataset.agent;
+    const signal=JSON.stringify([a.alive,a.needs_login,a.status]);
+    if(priorSignals.has(signalKey)&&priorSignals.get(signalKey)!==signal)tr.classList.add("agent-changed");
+    nextSignals.set(signalKey,signal);
     const nameBg=NAME_BG[a.name_color];
     const nameInner=nameBg?`<span class="inline-block rounded px-1.5 py-0.5 ${nameBg}">${esc(a.name)}</span>`:esc(a.name);
     // Only tmux agents can be attached to; daemons (kind "daemon", e.g. OpenClaw/Hermes) aren't in
@@ -298,20 +358,25 @@ function renderAgents(root, agents, summary=null, columns=[]){
     // column width never jumps).
     const attachCmd=`tmux attach -t "${a.tmux_session||a.name}"`;
     const nameCell=(a.kind!=="daemon")
-      ? `<span class="agent-name cursor-pointer hover:text-sky-600" data-copy="${esc(attachCmd)}" title="${esc(attachCmd)} (click to copy)">${nameInner}</span>`
+      ? `<button type="button" class="agent-name cursor-pointer hover:text-sky-600" data-copy="${esc(attachCmd)}" title="${esc(attachCmd)} (click to copy)">${nameInner}</button>`
       : nameInner;
     // Telegram deep-link icon for agents bridged to a bot (opens t.me/<bot> in a new tab).
-    const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" title="Open @${esc(a.telegram_bot)} in Telegram" class="inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="#229ED9"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
+    const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" aria-label="Open @${esc(a.telegram_bot)} in Telegram" title="Open @${esc(a.telegram_bot)} in Telegram" class="telegram-link inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
     const recovery=a.restart_warning?`<br><span class="text-[11px] text-amber-600" title="${esc(a.restart_warning)}">⚠ Fresh conversation</span>`:"";
     tr.innerHTML=
-      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap">${nameCell}${tg}${recovery}</td>`+
-      `<td class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
-      `<td class="px-2 py-1.5">${sid}</td>`+
-      `<td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
-      `<td class="px-2 py-1.5" title="${esc(statusTip)}"><span class="inline-flex items-center gap-1.5 whitespace-nowrap ${stCls}"><span class="h-2 w-2 rounded-full ${dot} shrink-0"></span><span class="flex flex-col">${esc(statusTxt)}</span></span></td>`+
-      columns.map(c=>`<td class="px-2 py-1.5 text-xs">${renderCell((a.cells||{})[c.id])}</td>`).join("")+
-      `<td class="px-2 py-1.5 text-right whitespace-nowrap">${renderActions(a, root.dataset.svc)}</td>`;
+      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title">${nameCell}${recovery}</div>${tg}</div></td>`+
+      `<td data-label="Model" class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
+      `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary>Connection details</summary>${sid}</details></td>`+
+      `<td data-label="Session age" class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
+      `<td data-label="Reported status" class="px-2 py-1.5" title="${esc(statusTip)}"><span class="inline-flex items-center gap-1.5 whitespace-nowrap ${stCls}"><span class="h-2 w-2 rounded-full ${dot} shrink-0"></span><span class="flex flex-col">${esc(statusTxt)}</span></span></td>`+
+      columns.map(c=>`<td data-label="${esc(c.title||c.id)}" class="px-2 py-1.5 text-xs">${renderCell((a.cells||{})[c.id])}</td>`).join("")+
+      `<td data-label="Controls" class="px-2 py-1.5 text-right whitespace-nowrap">${renderActions(a, root.dataset.svc)}</td>`;
+    const detail=tr.querySelector("details"); if(detail&&openDetails.has(tr.dataset.agent))detail.open=true;
     tb.appendChild(tr);
+    if(focusState&&focusState.agent===tr.dataset.agent&&focusState.selector){
+      const target=[...tr.querySelectorAll(focusState.selector)].find(el=>!focusState.act||el.dataset.act===focusState.act);
+      if(target)target.focus({preventScroll:true});
+    }
   });
 }
 // Collapsible blocks. The first OPEN_BY_DEFAULT blocks (agents table + the first service cards)
@@ -321,12 +386,14 @@ const OPEN_BY_DEFAULT=3;
 const collapseKey=n=>"agentsmon.collapsed:"+n;
 function setCollapsed(root,collapsed,persist){
   const b=q(root,".svc-body"),c=q(root,".svc-chev"); if(!b) return;
-  b.hidden=collapsed; if(c) c.textContent=collapsed?"▸":"▾"; root.dataset.collapsed=collapsed?"1":"0";
+  b.hidden=collapsed; const head=q(root,".svc-head"); if(head) head.setAttribute("aria-expanded",String(!collapsed)); if(c) c.textContent=collapsed?"▸":"▾"; root.dataset.collapsed=collapsed?"1":"0";
   if(persist){ try{ localStorage.setItem(collapseKey(root.dataset.cname||""),collapsed?"1":"0"); }catch(e){} }
 }
 function initCollapse(root,name,index){
   if(root.dataset.cname===name) return;
-  root.dataset.cname=name; let v=null; try{ v=localStorage.getItem(collapseKey(name)); }catch(e){}
+  root.dataset.cname=name;
+  const head=q(root,".svc-head"); if(head){head.tabIndex=0;head.setAttribute("role","button");head.setAttribute("aria-label", "Toggle "+name);}
+  let v=null; try{ v=localStorage.getItem(collapseKey(name)); }catch(e){}
   setCollapsed(root, v==null ? index>=OPEN_BY_DEFAULT : v==="1", false);
 }
 document.addEventListener("click",e=>{
@@ -334,10 +401,20 @@ document.addEventListener("click",e=>{
   const root=h.closest("section"); if(!root) return;
   setCollapsed(root, root.dataset.collapsed!=="1", true);
 });
+document.addEventListener("keydown",e=>{
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-copy]:not(button)")){e.preventDefault();e.target.click();}
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches(".svc-head")){e.preventDefault();e.target.click();}
+});
 async function refresh(){
+  if(refreshBusy)return; refreshBusy=true;
   try{
-    const d=await (await fetch("/api/state",{credentials:"same-origin"})).json();
-    document.getElementById('app').style.maxWidth=(850+(d.columns||[]).length*100)+'px';
+    const response=await fetch("/api/state",{credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(requestTimeoutMs)});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const d=await response.json();
+    if(!Array.isArray(d.agents)||!Array.isArray(d.services))throw new Error("Invalid snapshot");
+    document.getElementById("metric-agents").textContent=d.agents.length;
+    document.getElementById("metric-running").textContent=d.agents.filter(a=>a.kind!=="daemon"&&a.alive&&!a.needs_login).length;
+    document.getElementById("metric-attention").textContent=d.agents.filter(a=>!a.alive||a.needs_login||a.metadata_error).length;
     const agentsRoot=document.querySelector('section[data-svc="agents"]');
     renderAgents(agentsRoot, d.agents, null, d.columns||[]); initCollapse(agentsRoot,"agents",0);
     const tables=document.getElementById("plugin-tables");
@@ -367,14 +444,18 @@ async function refresh(){
     const sections=box.querySelectorAll("section");
     d.services.forEach((s,i)=>{ const root=sections[i]; q(root,".svc-name").textContent=s.name; renderService(root,s); initCollapse(root,s.name,i+1+(d.agent_tables||[]).length); });
     document.getElementById("footer").textContent="updated "+new Date().toLocaleTimeString()+` · core v${d.core.version} (${d.core.state})`;
-  }catch(e){document.getElementById("footer").textContent="connection lost…";}
+    lastSnapshot=Date.now(); connectionFailed=false; updateConnection();
+  }catch(e){document.getElementById("footer").textContent="connection lost…"; connectionFailed=true; updateConnection();
+  }finally{refreshBusy=false;}
 }
 function copyText(text){
   if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(text); }
   // Fallback for plain http (e.g. over a VPN IP): clipboard API needs a secure context.
+  const previousFocus=document.activeElement;
   const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
   document.body.appendChild(ta); ta.focus(); ta.select();
   try{ document.execCommand("copy"); }catch(e){} document.body.removeChild(ta);
+  if(previousFocus&&previousFocus.isConnected)previousFocus.focus({preventScroll:true});
   return Promise.resolve();
 }
 let _toastTimer;
@@ -411,7 +492,7 @@ document.addEventListener("click", async e=>{
 refresh(); setInterval(refresh, POLL*1000);
 </script></body></html>"""
 
-PAGE=PAGE.replace('AGENT_TABLES',
+PAGE=PAGE.replace('MISSION_CSS', _MISSION_CSS).replace('AGENT_TABLES',
     AGENT_TABLE.replace('KEY','agents').replace('HIDDEN','').replace('TITLE','Persistent Agents')
         .replace('NOTE','tmux sessions running an agent, linked by their <code>--resume</code> session id')+
     '<div id="plugin-tables"></div>'+
@@ -718,7 +799,8 @@ def make_server(host: str, port: int, cfg: dict):
     """Same handler for production and isolated HTTP acceptance tests."""
     require_auth_or_die(host, cfg)
     poll = cfg.get("dashboard", {}).get("poll_seconds", 15)
-    page = PAGE.replace("POLL", str(poll)).encode()
+    request_timeout = max(5, int(cfg.get("dashboard", {}).get("request_timeout_seconds", 120)))
+    page = PAGE.replace("POLL", str(poll)).replace("REQUEST_TIMEOUT", str(request_timeout)).encode()
     auth = cfg.get("dashboard", {}).get("auth") or {}
     auth_user, auth_hash = auth.get("user"), auth.get("pwhash")
 

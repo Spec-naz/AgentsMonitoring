@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0.dev1 (2026-10-29) — Mission Control preview
+
+- Replace clipped agent rows with responsive cards, wrapping full names and keeping Telegram links in their own reserved area.
+- Highlight actual agent status changes briefly; respect reduced-motion preferences.
+- Add a local dark/light theme preference, visible keyboard focus, accessible action names, keyboard section toggles and reduced-motion support.
+- Show native process counts separately from task activity or Telegram delivery; preserve provider-reported errors.
+- Display snapshot receipt age and persistent stale/connection-failed state, bound state fetches to a configurable timeout (120 seconds by default), reject non-success responses and prevent overlapping refreshes.
+- Preserve expanded connection details across refreshes. Keep provider columns, actions, health metrics and availability history.
+- Add fixture-based desktop/mobile and failure/recovery browser acceptance checks plus a documented rollback procedure. This is a development candidate, not a production deployment.
+
 ## 0.3.12 (2026-10-22)
 
 - The login hint for a Claude agent quotes the session name, so `tmux attach -t "T - Claude"` works when pasted. A test checks every attach hint.
