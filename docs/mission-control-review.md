@@ -1,6 +1,6 @@
 # Mission Control candidate review record
 
-Candidate: 0.4.0.dev1, branch `feat/mission-control-dashboard`.
+Candidate: 0.4.0.dev2, branch `feat/mission-control-dashboard`.
 
 ## Independent reviews
 
@@ -57,3 +57,22 @@ actual code. Neither review is a production deployment or a claim about live age
 CI repeats unit/lint/package checks on the configured Python matrix and both browser checks
 on Python 3.12. Until CI completes, local results do not constitute a CI pass. The existing
 production installation remains untouched.
+
+
+## Flight Deck design revision
+
+Claude implemented the visual design in a separate worktree, commits ec0e8f3 and c397ca9.
+Codex integrated the design and added gauge/clock/poll regression checks. An independent
+reviewer verified layout at 1280/1024/768/390/320 px and checked gauge and poll semantics.
+The review found stale light-theme small-text contrast around 3.55–3.60:1 because whole
+cards were dimmed. Claude fixed the issue by keeping text at full opacity/contrast and
+applying stale feedback to decorative lights. A Chromium recheck measured station labels
+at 6.45:1 and session-age text at 6.63:1, with card opacity 1 and no card filter.
+The gauge subtitle now says availability,
+which includes endpoint-backed daemons.
+
+The ring uses native agent observations, with `alive && !needs_login`; separate plugin
+tables are not folded into that gauge. The tmux-process count excludes daemons. The clock
+uses browser-local time, and the countdown follows the next scheduled polling callback;
+a manual refresh does not pretend to reschedule it. No new backend actions or auth changes
+were introduced by the cockpit design. The preview remains unmerged and undeployed.

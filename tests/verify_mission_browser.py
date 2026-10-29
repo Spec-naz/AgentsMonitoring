@@ -10,7 +10,7 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from agentsmon import dashboard
+from agentsmon import dashboard, __version__
 
 
 async def verify(out):
@@ -24,7 +24,7 @@ async def verify(out):
     payload = {'agents': [{**agent, 'name': 'CEO_Master', 'vendor': 'openai',
                            'kind': 'codex', 'label': 'GPT-6.1 Sol'}, agent],
                'services': [], 'columns': [], 'agent_tables': [],
-               'core': {'version': '0.4.0.dev1', 'state': 'clean'}}
+               'core': {'version': __version__, 'state': 'clean'}}
     mode = {'status': 200, 'delay': 2}
     posts = []
     async def route(request):
@@ -53,6 +53,9 @@ async def verify(out):
             assert await page.locator('#connection-announcement').inner_text() == ''
             await page.wait_for_function('document.querySelector("#metric-agents").textContent === "2"')
             await page.locator('#connection-state[data-state=fresh]').wait_for()
+            assert await page.locator('#gauge-value').text_content() == '2/2'
+            assert await page.locator('#gauge').get_attribute('data-level') == 'full'
+            assert float(await page.locator('#gauge-arc').get_attribute('stroke-dashoffset')) == 0
             mode['delay'] = 0
             assert 'columnheader' in await page.locator('[data-svc=agents] table').aria_snapshot()
             cards = page.locator('[data-svc="agents"] .agent-rows > tr')
@@ -82,6 +85,8 @@ async def verify(out):
             payload['agents'].append(daemon)
             await page.evaluate('refresh()')
             assert 'Endpoint unavailable' in await cards.nth(2).inner_text()
+            assert await page.locator('#gauge-value').text_content() == '2/3'
+            assert await page.locator('#gauge').get_attribute('data-level') == 'partial'
             daemon['alive'] = True
             await page.evaluate('refresh()')
             assert 'Endpoint responding' in await cards.nth(2).inner_text()
@@ -89,6 +94,9 @@ async def verify(out):
             payload['agents'].pop()
             agent['alive'] = False
             await page.evaluate('refresh()')
+            assert await page.locator('#gauge-value').text_content() == '1/2'
+            assert await page.locator('#gauge').get_attribute('data-level') == 'partial'
+            assert 144 < float(await page.locator('#gauge-arc').get_attribute('stroke-dashoffset')) < 145
             assert await cards.nth(1).evaluate('(el)=>el.classList.contains("agent-changed")')
             await page.evaluate('refresh()')
             assert not await cards.nth(1).evaluate('(el)=>el.classList.contains("agent-changed")')
@@ -125,6 +133,16 @@ async def verify(out):
             assert await page.locator('#app').get_attribute('data-stale') == 'false'
             await page.evaluate('lastSnapshot=Date.now()-staleAfter-1000;updateConnection()')
             assert await page.locator('#app').get_attribute('data-stale') == 'true'
+            await page.evaluate('nextPoll=Date.now()+5000;updateConnection()')
+            assert 'Next scheduled snapshot in 5s' in await page.locator('#poll-caption').inner_text()
+            assert await page.locator('#deck-clock').inner_text() != '--:--:--'
+            original_agents=payload['agents']
+            payload['agents']=[]
+            await page.evaluate('refresh()')
+            assert await page.locator('#gauge-value').text_content() == '0/0'
+            assert await page.locator('#gauge').get_attribute('data-level') == 'none'
+            payload['agents']=original_agents
+            await page.evaluate('refresh()')
             await page.emulate_media(reduced_motion='reduce')
             assert await page.locator('#theme-toggle').evaluate('(el)=>getComputedStyle(el).transitionDuration') == '0s'
             head = page.locator('[data-svc="agents"] .svc-head')
@@ -135,7 +153,7 @@ async def verify(out):
             assert await head.get_attribute('aria-expanded') == 'true'
             assert not errors, errors
             assert not posts, posts
-            print('PASS: desktop/mobile identity, Telegram, escaping, details, themes, stale/error/recovery, keyboard, reduced motion')
+            print('PASS: desktop/mobile identity, Telegram, escaping, details, themes, stale/error/recovery, keyboard, reduced motion, gauge states and poll timing')
         finally:
             await browser.close()
 

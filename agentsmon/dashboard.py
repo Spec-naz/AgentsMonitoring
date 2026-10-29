@@ -90,17 +90,44 @@ PAGE = r"""<!DOCTYPE html><html lang="en"><head>
 </head><body class="bg-slate-50 text-slate-800 antialiased">
 <div id="toast" class="fixed left-1/2 bottom-5 -translate-x-1/2 bg-slate-800 text-white text-sm px-2 py-1.5 rounded-md shadow-lg opacity-0 pointer-events-none" style="z-index:50">&nbsp;</div>
 <div id="app" class="mx-auto px-5 py-6" style="max-width:1200px">
-  <header class="mission-head">
-    <div><p class="eyebrow">AGENTS / OBSERVABILITY</p><h1>Mission control<span class="title-dot">.</span></h1>
-    <p class="mission-sub">Your agents. One clear signal.</p></div>
-    <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
+  <header class="deck-canopy">
+    <div class="deck-ident">
+      <span class="deck-insignia" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M32 4 58 19v26L32 60 6 45V19z"/><path d="M32 16 46 24v16L32 48 18 40V24z" opacity=".55"/><circle cx="32" cy="32" r="5" fill="currentColor" stroke="none"/><path d="M32 4v12M58 45l-12-5M6 45l12-5" opacity=".55"/></svg></span>
+      <div><p class="eyebrow">Agents Monitoring · Flight deck</p><h1>Mission control</h1>
+      <p class="mission-sub">Crew status from this host. Every lit reading comes from the latest snapshot.</p></div>
+    </div>
+    <div class="deck-switches">
+      <div class="deck-clock"><span>Local time</span><strong id="deck-clock">--:--:--</strong></div>
+      <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
+    </div>
   </header>
-  <div id="connection-state" role="status" aria-live="off" class="connection-state">Connecting · waiting for first snapshot</div>
   <span id="connection-announcement" class="sr-only" role="status" aria-live="polite"></span>
-  <div class="mission-metrics" aria-label="Native agent process overview">
-    <div><span>Agents observed</span><strong id="metric-agents">—</strong></div>
-    <div><span>Tmux processes up</span><strong id="metric-running">—</strong></div>
-    <div><span>Need attention</span><strong id="metric-attention">—</strong></div>
+  <div class="deck-cluster" id="deck-cluster">
+    <div class="instrument gauge-panel">
+      <p class="instrument-label">Crew up <i>availability</i></p>
+      <div class="gauge-body">
+        <svg class="gauge" id="gauge" data-level="none" viewBox="0 0 120 120" role="img" aria-label="Agents up: no snapshot yet">
+          <circle class="g-ticks" cx="60" cy="60" r="56"/>
+          <circle class="g-track" cx="60" cy="60" r="46"/>
+          <circle class="g-arc" id="gauge-arc" cx="60" cy="60" r="46" transform="rotate(-90 60 60)" stroke-dasharray="289.03" stroke-dashoffset="289.03"/>
+          <text id="gauge-value" x="60" y="64" text-anchor="middle">—</text>
+          <text class="g-sub" x="60" y="80" text-anchor="middle">UP / TOTAL</text>
+        </svg>
+        <p class="gauge-caption"><strong id="gauge-caption">Awaiting snapshot</strong>Agents whose process or endpoint answered the last check.</p>
+      </div>
+    </div>
+    <div class="instrument mission-metrics" aria-label="Native agent process overview">
+      <p class="instrument-label">Crew manifest <i>live counts</i></p>
+      <div><span>Agents observed</span><strong id="metric-agents">—</strong></div>
+      <div><span>Tmux processes up</span><strong id="metric-running">—</strong></div>
+      <div class="attn" id="metric-attention-box"><span>Need attention</span><strong id="metric-attention">—</strong></div>
+    </div>
+    <div class="instrument link-panel">
+      <p class="instrument-label">Telemetry link <i id="poll-interval"></i></p>
+      <div id="connection-state" role="status" aria-live="off" class="connection-state">Connecting · waiting for first snapshot</div>
+      <div class="poll-track" aria-hidden="true"><span id="poll-bar"></span></div>
+      <p class="poll-caption" id="poll-caption">Next scheduled snapshot pending</p>
+    </div>
   </div>
   <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
 AGENT_TABLES
@@ -195,6 +222,26 @@ function updateConnection(){
     announcedConnection=stale;
   }
   el.textContent=stale?(lastSnapshot?`Snapshot stale · last received ${age}s ago${failed?" · connection failed":""}`:"No snapshot available · connecting or retrying"):`Snapshot received ${age}s ago · refresh every ${POLL}s`;
+  // Deck clock and the poll bar show real time and the real refresh schedule — nothing simulated.
+  document.getElementById("deck-clock").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  const left=Math.max(0,Math.ceil((nextPoll-Date.now())/1000));
+  document.getElementById("poll-bar").style.transform=`scaleX(${Math.min(1,1-left/Number(POLL))})`;
+  document.getElementById("poll-caption").textContent=refreshBusy?"Requesting snapshot…":`Next scheduled snapshot in ${left}s`;
+}
+let nextPoll=Date.now()+Number(POLL)*1000;
+document.getElementById("poll-interval").textContent=`every ${POLL}s`;
+function renderGauge(agents){
+  const up=agents.filter(a=>a.alive&&!a.needs_login).length, total=agents.length;
+  const gauge=document.getElementById("gauge"), C=289.03;
+  gauge.dataset.level=!total?"none":up===total?"full":up?"partial":"down";
+  document.getElementById("gauge-arc").setAttribute("stroke-dashoffset", String(total?C*(1-up/total):C));
+  document.getElementById("gauge-value").textContent=`${up}/${total}`;
+  gauge.setAttribute("aria-label", `Agents up: ${up} of ${total}`);
+  document.getElementById("gauge-caption").textContent=!total?"No agents observed":up===total?"All agents up":up?`${total-up} not up`:"No agent up";
+}
+function sweepDeck(){
+  const deck=document.getElementById("deck-cluster");
+  deck.classList.remove("deck-sweep"); void deck.offsetWidth; deck.classList.add("deck-sweep");
 }
 setInterval(()=>updateConnection(),1000);
 const STATE = {
@@ -295,7 +342,7 @@ function renderActions(a,table){
            :{id:"stop",label:"Stop "+a.name,icon:"stop"}]);
   const paths={restart:'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',stop:'M18 6 6 18M6 6l12 12',run:'M8 5l11 7-11 7z'};
   const buttons=defs.map(x=>`<button class="agent-act inline-flex align-middle p-1 rounded text-slate-400 ${x.icon==='stop'?'ml-0.5 hover:text-rose-600 hover:bg-rose-50':'hover:text-sky-600 hover:bg-slate-100'}" data-act="${esc(x.id)}" data-name="${esc(a.name)}" ${a.plugin?`data-table="${esc(table)}" data-row="${esc(a.id)}"`:''} data-confirm="${esc(x.confirm||'')}" aria-label="${esc(x.label)}" title="${esc(x.label)}"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[x.icon]||paths.run}"/></svg></button>`).join("");
-  return buttons+((a.actions===false||a.actions_locked)?'<span class="text-xs text-slate-300 ml-0.5 align-middle" title="Actions controlled by the provider">🔒</span>':'');
+  return buttons+((a.actions===false||a.actions_locked)?'<span class="provider-lock text-xs text-slate-300 ml-0.5 align-middle" role="img" aria-label="Actions controlled by the provider" title="Actions controlled by the provider"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>':'');
 }
 const previousAgentSignals=new WeakMap();
 function renderAgents(root, agents, summary=null, columns=[]){
@@ -325,7 +372,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
   const focusState=focusedRow?{agent:focusedRow.dataset.agent,act:focused.dataset.act,
     selector:focused.matches(".agent-act")?".agent-act":focused.matches(".agent-name")?".agent-name":focused.matches("summary")?"summary":focused.matches(".sid")?".sid":focused.matches(".telegram-link")?".telegram-link":null}:null;
   tb.innerHTML="";
-  agents.forEach(a=>{
+  agents.forEach((a,index)=>{
     const tcls=VENDOR[a.vendor]||"bg-slate-100 text-slate-600";
     const copy=a.resume_cmd||a.session_id||"";
     const tip=copy?`${copy} (click to copy)`:"no resume";
@@ -347,6 +394,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
       ok&&a.latency_ms!=null?`latency ${fmtLat(a.latency_ms)}`:""].filter(Boolean).join(" · ");
     const stCls=a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
     const tr=document.createElement("tr"); tr.dataset.agent=a.id||a.name; tr.className="border-b border-slate-100 last:border-0";
+    tr.dataset.state=a.needs_login?"login":ok?"ok":"down";
     const signalKey=tr.dataset.agent;
     const signal=JSON.stringify([a.alive,a.needs_login,a.status]);
     if(priorSignals.has(signalKey)&&priorSignals.get(signalKey)!==signal)tr.classList.add("agent-changed");
@@ -364,7 +412,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
     const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" aria-label="Open @${esc(a.telegram_bot)} in Telegram" title="Open @${esc(a.telegram_bot)} in Telegram" class="telegram-link inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
     const recovery=a.restart_warning?`<br><span class="text-[11px] text-amber-600" title="${esc(a.restart_warning)}">⚠ Fresh conversation</span>`:"";
     tr.innerHTML=
-      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title">${nameCell}${recovery}</div>${tg}</div></td>`+
+      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title"><span class="station-id">Station ${String(index+1).padStart(2,"0")}</span>${nameCell}${recovery}</div>${tg}</div></td>`+
       `<td data-label="Model" class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
       `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary>Connection details</summary>${sid}</details></td>`+
       `<td data-label="Session age" class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
@@ -414,7 +462,10 @@ async function refresh(){
     if(!Array.isArray(d.agents)||!Array.isArray(d.services))throw new Error("Invalid snapshot");
     document.getElementById("metric-agents").textContent=d.agents.length;
     document.getElementById("metric-running").textContent=d.agents.filter(a=>a.kind!=="daemon"&&a.alive&&!a.needs_login).length;
-    document.getElementById("metric-attention").textContent=d.agents.filter(a=>!a.alive||a.needs_login||a.metadata_error).length;
+    const attention=d.agents.filter(a=>!a.alive||a.needs_login||a.metadata_error).length;
+    document.getElementById("metric-attention").textContent=attention;
+    document.getElementById("metric-attention-box").dataset.alert=attention?"true":"false";
+    renderGauge(d.agents);
     const agentsRoot=document.querySelector('section[data-svc="agents"]');
     renderAgents(agentsRoot, d.agents, null, d.columns||[]); initCollapse(agentsRoot,"agents",0);
     const tables=document.getElementById("plugin-tables");
@@ -444,9 +495,9 @@ async function refresh(){
     const sections=box.querySelectorAll("section");
     d.services.forEach((s,i)=>{ const root=sections[i]; q(root,".svc-name").textContent=s.name; renderService(root,s); initCollapse(root,s.name,i+1+(d.agent_tables||[]).length); });
     document.getElementById("footer").textContent="updated "+new Date().toLocaleTimeString()+` · core v${d.core.version} (${d.core.state})`;
-    lastSnapshot=Date.now(); connectionFailed=false; updateConnection();
+    lastSnapshot=Date.now(); connectionFailed=false; sweepDeck(); updateConnection();
   }catch(e){document.getElementById("footer").textContent="connection lost…"; connectionFailed=true; updateConnection();
-  }finally{refreshBusy=false;}
+  }finally{refreshBusy=false; updateConnection();}
 }
 function copyText(text){
   if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(text); }
@@ -489,7 +540,7 @@ document.addEventListener("click", async e=>{
   }catch(err){ showToast("⚠ "+err); }
   setTimeout(refresh, act==="restart"?2500:600);
 });
-refresh(); setInterval(refresh, POLL*1000);
+refresh(); setInterval(()=>{nextPoll=Date.now()+POLL*1000; refresh();}, POLL*1000);
 </script></body></html>"""
 
 PAGE=PAGE.replace('MISSION_CSS', _MISSION_CSS).replace('AGENT_TABLES',

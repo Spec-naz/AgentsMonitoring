@@ -2,6 +2,8 @@
 
 - Work on the user's fork, Spec-naz/AgentsMonitoring. Keep changes on a feature branch and
   submit a PR with the problem, resulting behavior, validation and material limitations.
+- Claude owns dashboard visual design and implementation; Codex handles technical integration,
+  verification and GitHub publication. The user visual direction is a spaceship cockpit/control panel.
 - Preserve the dependency-free runtime unless a concrete requirement justifies a change.
 - The user requests collaboration with Claude: use an independent review of substantial
   changes. Record findings and their resolution. Do not claim review approval when it is

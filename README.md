@@ -382,9 +382,9 @@ stored as SHA-256 hashes. Restart commands and trusted plugins run as your user.
 MIT — see [LICENSE](LICENSE).
 
 
-### Mission Control preview (0.4.0.dev1)
+### Flight Deck preview (0.4.0.dev2)
 
-The dashboard now uses responsive agent cards with full names and a dedicated Telegram link.
+The dashboard is a spacecraft flight deck with an availability gauge, live clock, actual refresh countdown and responsive agent stations. Full names and dedicated Telegram controls remain accessible.
 Use **Light mode / Dark mode** to save a theme on this browser. Open **Connection details**
 for the session identifier or port. Native process counts do not prove task progress or
 Telegram delivery. A stale snapshot banner means the displayed values are historical; it

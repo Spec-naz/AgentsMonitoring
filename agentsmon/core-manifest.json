@@ -1,11 +1,11 @@
 {
-  "content_id": "e06de5d2b65d988eacea4cfc8d002677c42bbb68088346edb1f3a3c962cc5a5d",
+  "content_id": "9b2cadf5033f1236892bc748eb48088a7cce24b73d3985129ebb3dea125bf17f",
   "files": {
-    "__init__.py": "c962490cdbd832979221dbda08dd20ac02241fa367279764a89092803629d4cd",
+    "__init__.py": "fa3aa567d3815c43404266ad51eee2fd0fcb444c8af025327f29da176593d7a1",
     "__main__.py": "5141a43a820decea25d52515be4f2567b992176a81008b1b6532cedbbe574808",
     "bridges.py": "9525ab9ad7c86f9d0e06ee44c1ee9558ab88331c088a21361fbcc1e86f815540",
     "config.py": "b82b76175ddade997edec84b44b8fe14e50f8f503c5f173447419469fbd421a6",
-    "dashboard.py": "b75decfa72cf6012f72255179782b37ef1125ce798cd94d793163a6162834526",
+    "dashboard.py": "bdba0ae54ea95cb4cd6607a9b5060c7e0fcf4d68fe9e3ab50f68703a7055f8de",
     "db.py": "470bafc161d24ac1bea302af0873ebf2e596a8ce77796cb29e79189bb2d1c5cf",
     "detect.py": "ca13453396ca0eab43a3cb067ca7ac5e8af9685f9f56a8ebd9f2b1f221e302e2",
     "dialogs.py": "690cf9a5fb439809329a8054d74de32cca192b67d6e931926762f345812b2b66",
@@ -19,7 +19,7 @@
     "probe.py": "54b1a6461af4d446270a4cac90e8a4faf262c082ccb6967c77282fb3e6c4158f",
     "restarter.py": "90e18202d5360798ac8a9bba956cf5a11f7475248941674cc1fde20a0456ab91",
     "service.py": "8a0145501b5596586633e91b3479d20b3f45aa54f75e0fef858ab5df08d7f70a",
-    "static/dashboard.css": "f9504e73a944df4fd0933a241f6dcc3a09feafb0dc984340066a29dcab6a6252",
+    "static/dashboard.css": "4efb12d128058f31987247bdc38507d06dc88aeb741f105890863e0c793f2988",
     "static/tailwind.js": "176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15",
     "status.py": "03f98847add6fad24e51760f68bccf38c0f2bebb58fe541122e3d2b83d94d2da",
     "uninstaller.py": "c149b57897c91322abcfbf3a41e47b1fd37127212f0f6f9de5f9813af14a5b26",
@@ -27,6 +27,6 @@
     "usage_plugin.py": "d30e2fd2ff35c486cabed7dc7913028fffddee4ab9a8cb9c9c3ecee83ca5c72a",
     "wizard.py": "558b0f1a3699e87d7cafd48abd8ca3eeeb198cb4a7d9ccb0ae054d84dc1d86fe"
   },
-  "release": "v0.4.0.dev1",
-  "version": "0.4.0.dev1"
+  "release": "v0.4.0.dev2",
+  "version": "0.4.0.dev2"
 }

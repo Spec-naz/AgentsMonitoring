@@ -1,7 +1,16 @@
 # Changelog
 
+## 0.4.0.dev2 (2026-10-29) — Flight Deck preview
+
+- Claude designed and implemented a spaceship cockpit: instrument bezels, crew availability gauge, station panels, clock, hardware-style controls and amber/cyan accents in dark/light themes.
+- Instruments show actual agent observations and the actual poll schedule; snapshot sweep and status changes respect reduced motion.
+- Independent review caught stale/light small-text contrast loss; text remains full contrast while decorative lights indicate stale data. The gauge label describes availability, including endpoint-backed daemons.
+- Add browser regression checks for full/partial/empty gauge values, endpoint-backed availability, live clock and next-poll timing. Preserve earlier functional fixes and provider compatibility.
+- This development preview is documented and reviewable; production deployment remains separate.
+
 ## 0.4.0.dev1 (2026-10-29) — Mission Control preview
 
+- Flight deck visual design: cockpit canopy with local clock, instrument cluster (ring gauge of agents up, live count readouts, telemetry link with snapshot age and the real refresh countdown), advisory placard, and agent "stations" with state-lit rails, hardware-style keys and corner-bracket bezels. Every lit element is driven by a real snapshot or the real poll schedule; the only motion answers a received snapshot or a changed agent signal. Stale snapshots dash the deck borders and grey out status lights and gauge arcs while text keeps full contrast (≥4.5:1 measured in both themes). No external fonts or assets.
 - Replace clipped agent rows with responsive cards, wrapping full names and keeping Telegram links in their own reserved area.
 - Highlight actual agent status changes briefly; respect reduced-motion preferences.
 - Add a local dark/light theme preference, visible keyboard focus, accessible action names, keyboard section toggles and reduced-motion support.

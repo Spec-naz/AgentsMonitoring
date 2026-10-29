@@ -1,62 +1,231 @@
-/* Mission Control. Local assets only; no font or telemetry requests. */
-:root{color-scheme:dark;--canvas:#080e1a;--panel:#101b2c;--panel-raised:#142238;--ink:#edf4ff;--muted:#a3b4cd;--line:#283b55;--accent:#63e1e5;--good:#69e8b5;--bad:#ff91a4;--warn:#ffd180;--shadow:0 18px 50px #0002}
-:root[data-theme=light]{color-scheme:light;--canvas:#edf2f8;--panel:#fff;--panel-raised:#f3f7fc;--ink:#16253d;--muted:#50627b;--line:#c7d4e4;--accent:#006c79;--good:#087653;--bad:#b71f42;--warn:#895600;--shadow:0 12px 40px #2233440a}
-body{background:radial-gradient(ellipse at 85% 0%,color-mix(in srgb,var(--accent) 7%,transparent),transparent 45%),var(--canvas)!important;color:var(--ink)!important;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
-#app{max-width:1200px!important;padding:42px 28px 24px}
-.mission-head{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:24px}
-.eyebrow{font:600 11px ui-monospace,monospace;letter-spacing:.22em;color:var(--accent);margin-bottom:10px}
-#app h1{font-size:clamp(30px,5vw,48px);line-height:1.15;font-weight:650;letter-spacing:-.045em}.title-dot{color:var(--accent)}
-.mission-sub{color:var(--muted);font-size:14px;margin-top:10px}
-#theme-toggle{padding:9px 14px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font-size:12px;white-space:nowrap}
-.connection-state{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:10px 14px;color:var(--muted);font:12px ui-monospace,monospace;margin-bottom:16px;overflow-wrap:anywhere}
-.connection-state:before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warn);margin-right:10px}
-.connection-state[data-state=fresh]:before{background:var(--good)}
+/* Flight Deck. A spacecraft cockpit for agent monitoring.
+   Local assets only: no font, image or telemetry requests. Every lit element is driven by a real
+   snapshot or the real poll schedule; motion only answers an actual event (snapshot received,
+   agent signal changed) and is removed under prefers-reduced-motion.
+   Amber = instrument markings and labels, cyan = live data and controls. */
+:root{color-scheme:dark;
+  --canvas:#04070d;--hull:#0a111e;--panel:#0d1626;--panel-raised:#122036;--inset:#060b14;
+  --ink:#e8f1ff;--muted:#93a7c4;--line:#1c2a42;--line-hi:#2e4569;
+  --accent:#5fe3ea;--accent-dim:#5fe3ea26;--amber:#ffb84d;--amber-dim:#ffb84d24;
+  --good:#5ff2a8;--bad:#ff6f86;--warn:#ffcf66;
+  --glow:0 0 12px;--shadow:0 22px 60px #0008,inset 0 1px 0 #ffffff08;
+  --display:"Eurostile","Microgramma","Bank Gothic","Michroma","Orbitron","Bahnschrift","DIN Alternate","Barlow Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --mono:"JetBrains Mono","IBM Plex Mono","SF Mono",ui-monospace,Menlo,Consolas,"DejaVu Sans Mono",monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+:root[data-theme=light]{color-scheme:light;
+  --canvas:#e4e9ef;--hull:#eef2f6;--panel:#f8fafc;--panel-raised:#edf1f6;--inset:#dfe6ee;
+  --ink:#0f1b2d;--muted:#475a73;--line:#c2cddb;--line-hi:#93a5bd;
+  --accent:#006a74;--accent-dim:#006a7414;--amber:#8f5400;--amber-dim:#8f540014;
+  --good:#08784e;--bad:#b21d3d;--warn:#875700;
+  --glow:0 0 0;--shadow:0 10px 30px #1b2a4012,inset 0 1px 0 #fff}
+
+/* ---- hull ------------------------------------------------------------------------------- */
+body{background:
+  radial-gradient(ellipse 80% 50% at 50% -10%,var(--accent-dim),transparent 70%),
+  linear-gradient(var(--line) 1px,transparent 1px) 0 0/48px 48px,
+  linear-gradient(90deg,var(--line) 1px,transparent 1px) 0 0/48px 48px,
+  var(--canvas)!important;
+  background-blend-mode:normal,soft-light,soft-light,normal;
+  color:var(--ink)!important;font-family:var(--sans);min-height:100vh}
+:root[data-theme=light] body{background:linear-gradient(#0f1b2d0a 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,#0f1b2d0a 1px,transparent 1px) 0 0/48px 48px,var(--canvas)!important}
+#app{max-width:1240px!important;padding:28px 28px 28px;position:relative}
+
+/* ---- canopy: identity, clock, day/night switch ----------------------------------------- */
+.deck-canopy{display:flex;justify-content:space-between;align-items:stretch;gap:20px;margin-bottom:18px;
+  padding:18px 22px;border:1px solid var(--line-hi);border-radius:4px 4px 22px 22px;background:linear-gradient(180deg,var(--panel-raised),var(--hull));box-shadow:var(--shadow);position:relative}
+.deck-canopy:before,.deck-canopy:after{content:"";position:absolute;top:-1px;height:3px;width:22%;background:var(--amber)}
+.deck-canopy:before{left:28px}.deck-canopy:after{right:28px;background:var(--accent)}
+.deck-ident{display:flex;gap:16px;align-items:center;min-width:0}
+.deck-insignia{flex:0 0 54px;height:54px;color:var(--accent);filter:drop-shadow(var(--glow) var(--accent-dim))}
+.deck-insignia svg{width:100%;height:100%}
+.eyebrow{font:600 10.5px var(--mono);letter-spacing:.28em;color:var(--amber);margin-bottom:6px;text-transform:uppercase}
+#app h1{font:700 clamp(24px,4.2vw,40px)/1.05 var(--display);text-transform:uppercase;letter-spacing:.08em}
+.mission-sub{color:var(--muted);font-size:13px;margin-top:8px;max-width:52ch}
+.deck-switches{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.deck-clock{display:flex;flex-direction:column;align-items:flex-end;padding:8px 14px;border:1px solid var(--line);border-radius:6px;background:var(--inset)}
+.deck-clock span{font:600 9.5px var(--mono);letter-spacing:.22em;color:var(--amber)}
+.deck-clock strong{font:500 20px var(--mono);font-variant-numeric:tabular-nums;color:var(--accent);letter-spacing:.06em;text-shadow:var(--glow) var(--accent-dim)}
+#theme-toggle{position:relative;padding:10px 14px 10px 34px;border:1px solid var(--line-hi);border-radius:6px;background:var(--inset);color:var(--ink);
+  font:600 11px var(--mono);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;box-shadow:inset 0 -2px 0 #0005}
+#theme-toggle:before{content:"";position:absolute;left:12px;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:2px;background:var(--amber);box-shadow:var(--glow) var(--amber-dim)}
+
+/* ---- instrument cluster ------------------------------------------------------------------ */
+.deck-cluster{display:grid;grid-template-columns:minmax(280px,1.25fr) minmax(0,2fr) minmax(250px,1.25fr);gap:14px;margin-bottom:14px;position:relative}
+.instrument{position:relative;border:1px solid var(--line-hi);border-radius:8px;background:linear-gradient(160deg,var(--panel-raised),var(--panel));box-shadow:var(--shadow);padding:16px 18px;min-width:0}
+/* Corner brackets: the bezel of every instrument. */
+.instrument:after,section[data-svc] .agent-rows>tr:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:
+    linear-gradient(var(--amber),var(--amber)) top left/14px 2px,linear-gradient(var(--amber),var(--amber)) top left/2px 14px,
+    linear-gradient(var(--amber),var(--amber)) bottom right/14px 2px,linear-gradient(var(--amber),var(--amber)) bottom right/2px 14px;
+  background-repeat:no-repeat;opacity:.85}
+.instrument-label{display:flex;justify-content:space-between;gap:8px;font:600 10px var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--amber);margin-bottom:12px}
+.instrument-label i{font-style:normal;color:var(--muted);letter-spacing:.12em}
+
+/* Ring gauge: share of agents whose process/endpoint is up in the latest snapshot. */
+.gauge-panel{display:flex;flex-direction:column}
+.gauge-body{display:flex;align-items:center;gap:16px}
+.gauge{flex:0 0 116px;width:116px;height:116px}
+.gauge .g-ticks{stroke:var(--line-hi);stroke-width:5;stroke-dasharray:1.2 5.08;fill:none}
+.gauge .g-track{stroke:var(--inset);stroke-width:9;fill:none}
+.gauge .g-arc{stroke:var(--good);stroke-width:9;fill:none;stroke-linecap:butt;transition:stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1),stroke .3s;filter:drop-shadow(var(--glow) var(--good))}
+.gauge[data-level=partial] .g-arc{stroke:var(--warn);filter:drop-shadow(var(--glow) var(--warn))}
+.gauge[data-level=down] .g-arc{stroke:var(--bad);filter:drop-shadow(var(--glow) var(--bad))}
+.gauge[data-level=none] .g-arc{stroke:var(--line-hi);filter:none}
+.gauge text{font:600 22px var(--mono);fill:var(--ink);font-variant-numeric:tabular-nums}
+.gauge .g-sub{font:600 7px var(--mono);letter-spacing:.2em;fill:var(--muted)}
+.gauge-caption{font-size:12px;color:var(--muted);line-height:1.5}
+.gauge-caption strong{display:block;font:600 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin-bottom:4px}
+
+/* Readout modules (counts). */
+.mission-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0;padding:16px 18px}
+.mission-metrics .instrument-label{grid-column:1/-1;margin-bottom:2px}
+.mission-metrics>div{border:1px solid var(--line);border-radius:6px;padding:14px 14px 12px;background:var(--inset);position:relative;overflow:hidden;min-width:0}
+.mission-metrics>div:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+.mission-metrics>div.attn:before{background:var(--amber)}
+.mission-metrics>div span{display:block;color:var(--muted);font:600 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
+.mission-metrics strong{display:block;font:500 40px/1 var(--mono);letter-spacing:-.02em;margin-top:12px;font-variant-numeric:tabular-nums;color:var(--accent);text-shadow:var(--glow) var(--accent-dim)}
+.mission-metrics>div.attn strong{color:var(--ink);text-shadow:none}
+.mission-metrics>div.attn[data-alert=true] strong{color:var(--amber);text-shadow:var(--glow) var(--amber-dim)}
+
+/* Telemetry link: snapshot freshness and the real refresh schedule. */
+.link-panel{display:flex;flex-direction:column;gap:10px}
+.connection-state{border:1px solid var(--line);background:var(--inset);border-radius:6px;padding:10px 12px;color:var(--muted);font:12px/1.5 var(--mono);overflow-wrap:anywhere;margin:0}
+.connection-state:before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:10px;vertical-align:1px;box-shadow:var(--glow) var(--warn)}
+.connection-state[data-state=fresh]{color:var(--ink)}
+.connection-state[data-state=fresh]:before{background:var(--good);box-shadow:var(--glow) var(--good)}
 .connection-state[data-state=stale]{border-color:var(--warn);color:var(--warn)}
-.mission-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0 12px}
-.mission-metrics>div{border:1px solid var(--line);border-radius:14px;padding:20px;background:linear-gradient(125deg,var(--panel-raised),var(--panel));box-shadow:var(--shadow)}
-.mission-metrics span{display:block;color:var(--muted);font-size:12px}.mission-metrics strong{display:block;font-size:34px;font-weight:550;letter-spacing:-.05em;margin-top:10px;font-variant-numeric:tabular-nums}
-.signal-note{font-size:12px;color:var(--muted);margin-bottom:30px}
+.poll-track{height:6px;border-radius:1px;background:var(--inset);border:1px solid var(--line);overflow:hidden}
+.poll-track span{display:block;height:100%;width:100%;background:repeating-linear-gradient(90deg,var(--accent) 0 6px,transparent 6px 8px);transform-origin:left;transform:scaleX(0);transition:transform 1s linear}
+.poll-caption{font:11px var(--mono);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* A snapshot arriving sweeps the cluster once. Event-driven, never looping. */
+.deck-cluster.deck-sweep:before{content:"";position:absolute;inset:0;pointer-events:none;z-index:2;border-radius:8px;
+  background:linear-gradient(90deg,transparent,var(--accent-dim) 85%,var(--accent) 100%) no-repeat;background-size:18% 100%;opacity:.5;animation:deck-sweep .7s ease-out 1 forwards}
+@keyframes deck-sweep{0%{background-position:-25% 0;opacity:.5}90%{opacity:.5}100%{background-position:125% 0;opacity:0}}
+
+/* Caution placard. */
+.signal-note{display:flex;align-items:center;gap:12px;font:11.5px/1.5 var(--mono);color:var(--muted);margin:0 0 26px;padding:9px 14px;border:1px solid var(--line);border-radius:6px;background:var(--hull)}
+.signal-note:before{content:"ADVISORY";flex-shrink:0;font-weight:700;letter-spacing:.2em;font-size:10px;color:#1a1200;padding:3px 8px;border-radius:2px;
+  background:repeating-linear-gradient(-45deg,var(--amber) 0 7px,#e6a43c 7px 14px)}
+:root[data-theme=light] .signal-note:before{color:#fff;background:var(--amber)}
+
+/* ---- Tailwind palette mapped to deck tokens (both themes) -------------------------------- */
 #app .bg-white,#app .bg-slate-50{background-color:var(--panel)!important}
 #app [class*=border-slate-]{border-color:var(--line)!important}
 #app .text-slate-800,#app .text-slate-700,#app .text-slate-600{color:var(--ink)!important}
 #app .text-slate-500,#app .text-slate-400,#app .text-slate-300{color:var(--muted)!important}
 #app .text-emerald-600{color:var(--good)!important}#app .text-rose-600{color:var(--bad)!important}#app .text-amber-600{color:var(--warn)!important}
 #app .bg-emerald-50{background:var(--panel)!important;border-color:var(--good)!important}#app .bg-rose-50{background:var(--panel)!important;border-color:var(--bad)!important}
-#app .svc-head{padding:15px 17px;border-radius:12px;cursor:pointer;user-select:none;background:var(--panel)!important}
-.svc-head h2{letter-spacing:-.02em}#app .svc-chev{margin-left:12px}
+#app .bg-emerald-500{background:var(--good)!important;box-shadow:var(--glow) var(--good)}
+#app .bg-rose-500{background:var(--bad)!important;box-shadow:var(--glow) var(--bad)}
+#app .bg-amber-500{background:var(--warn)!important;box-shadow:var(--glow) var(--warn)}
+#app .bg-slate-300,#app .bg-slate-200{background:var(--line-hi)!important}
+
+/* ---- section heads: console bars ---------------------------------------------------------- */
+#app .svc-head{position:relative;padding:12px 16px 12px 22px;border-radius:6px;cursor:pointer;user-select:none;background:linear-gradient(90deg,var(--panel-raised),var(--panel))!important;border-color:var(--line-hi)!important}
+#app .svc-head:before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--amber)}
+.svc-head h2{font:700 15px var(--display)!important;text-transform:uppercase;letter-spacing:.14em}
+#app .svc-head .agents-count,#app .svc-head .svc-state{font:600 11px var(--mono)!important;letter-spacing:.12em;text-transform:uppercase}
+#app .svc-chev{margin-left:12px;color:var(--amber)!important}
 #app section[data-svc]>.svc-body>div:first-child{background:transparent!important;border:0!important;overflow:visible}
+
+/* ---- agent stations (cards) --------------------------------------------------------------- */
 section[data-svc] table{display:block;min-width:0!important;table-layout:auto!important}
 section[data-svc] colgroup{display:none}
 section[data-svc] thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-section[data-svc] .agent-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
-section[data-svc] .agent-rows>tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 20px;border:1px solid var(--line)!important;border-radius:16px;padding:21px;background:var(--panel);box-shadow:var(--shadow);align-content:start}
+section[data-svc] .agent-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+section[data-svc] .agent-rows>tr{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;border:1px solid var(--line-hi)!important;border-radius:8px;padding:18px 20px 20px 24px;
+  background:linear-gradient(165deg,var(--panel-raised),var(--panel) 60%);box-shadow:var(--shadow);align-content:start;overflow:hidden}
+/* Status rail on the left edge, lit from the station's real state. */
+section[data-svc] .agent-rows>tr:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line-hi)}
+section[data-svc] .agent-rows>tr[data-state=ok]:before{background:var(--good);box-shadow:var(--glow) var(--good)}
+section[data-svc] .agent-rows>tr[data-state=login]:before{background:var(--warn);box-shadow:var(--glow) var(--warn)}
+section[data-svc] .agent-rows>tr[data-state=down]:before{background:var(--bad)}
 section[data-svc] .agent-rows td{display:block;overflow:visible;min-width:0;padding:0;text-align:left;white-space:normal;overflow-wrap:anywhere}
-section[data-svc] .agent-rows td:before{content:attr(data-label);display:block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:500;margin-bottom:7px}
-section[data-svc] .agent-rows td:first-child{grid-column:1/-1;padding-bottom:16px;border-bottom:1px solid var(--line)}
+section[data-svc] .agent-rows td:before{content:attr(data-label);display:block;font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.2em;color:var(--amber);margin-bottom:6px}
+section[data-svc] .agent-rows td:not(:first-child):not([colspan]){border-top:1px dashed var(--line);padding-top:10px}
+section[data-svc] .agent-rows td:first-child{grid-column:1/-1;padding-bottom:4px}
 section[data-svc] .agent-rows td:first-child:before{display:none}
-.agent-identity{display:flex;align-items:center;gap:12px;min-width:0}
-.agent-avatar{display:grid;place-items:center;flex:0 0 40px;height:40px;border:1px solid var(--line);background:var(--panel-raised);border-radius:12px;font:500 18px ui-monospace,monospace;color:var(--accent)}
-.agent-title{flex:1;min-width:0}.agent-name{font-size:14px;line-height:1.5;text-align:left;white-space:normal;overflow-wrap:anywhere;max-width:100%;font-weight:600}
-.telegram-link{display:grid!important;place-items:center;flex:0 0 40px;width:40px;height:40px;border-radius:12px;border:1px solid var(--line);color:var(--accent);background:var(--panel-raised)}.telegram-link svg{width:20px;height:20px}
-.session-detail{font-size:12px;color:var(--muted)}.session-detail summary{cursor:pointer;color:var(--accent)}.session-detail .sid{white-space:normal;overflow-wrap:anywhere;margin-top:8px;overflow:visible;font-size:11px}
-.agent-rows button:not(.agent-name){min-width:34px;min-height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel-raised);padding:6px}
-.agent-rows td[colspan]{grid-column:1/-1;color:var(--muted)}
-#app[data-stale=true] section .svc-head{border-style:dashed!important}
-#app .agents-note{margin-top:12px}#app .svc-body>.grid>div,#app .svc-body>.p-4{border-radius:14px}
-#app .svc-body>.grid>div{padding:18px}#app .svc-body>.grid .text-lg{font-size:25px}
-#app .svc-rows-wrap{border-radius:12px}#app .svc-rows-wrap table{min-width:680px}
-#footer{margin-top:28px!important;font:11px ui-monospace,monospace!important}
-#toast{background:var(--ink)!important;color:var(--canvas)!important;border-radius:10px!important;padding:12px 18px!important;max-width:90vw}
-button,a,summary,[role=button]{touch-action:manipulation}button,a,summary{transition:background-color .16s ease,border-color .16s ease}
-button:hover,a:hover{border-color:var(--accent)}:focus-visible{outline:2px solid var(--accent)!important;outline-offset:4px}
-@media(max-width:760px){#app{padding:26px 16px 20px}.mission-head{gap:12px}.mission-metrics{gap:8px}.mission-metrics>div{padding:14px 10px}.mission-metrics span{font-size:11px}.mission-metrics strong{font-size:28px}section[data-svc] .agent-rows{grid-template-columns:1fr}.svc-head{flex-wrap:wrap}.svc-head h2{font-size:14px}.signal-note{line-height:1.6}.svc-body>.grid{gap:8px!important}#app .svc-body>.grid>div{padding:12px 8px}#app .svc-body>.grid .text-lg{font-size:19px}}
-@keyframes signal-change{0%{box-shadow:0 0 0 2px var(--accent)}100%{box-shadow:var(--shadow)}}
-.agent-changed{animation:signal-change .8s ease-out}
-@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-
-.agent-rows td[data-label="Reported status"]>span{white-space:normal;max-width:100%;align-items:flex-start}
+section[data-svc] .agent-rows td[data-label="Controls"]{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+section[data-svc] .agent-rows td[data-label="Controls"]:before{margin:0 auto 0 0}
+.station-id{display:block;font:600 9.5px var(--mono);letter-spacing:.24em;color:var(--muted);text-transform:uppercase;margin-bottom:3px}
+.agent-identity{display:flex;align-items:flex-start;gap:14px;min-width:0}
+.agent-avatar{display:grid;place-items:center;flex:0 0 44px;height:44px;clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);
+  background:linear-gradient(160deg,var(--accent),color-mix(in srgb,var(--accent) 45%,var(--panel)));font:700 18px var(--display);color:var(--canvas)}
+.agent-title{flex:1;min-width:0}
+.agent-name{font:700 15px/1.35 var(--display);letter-spacing:.04em;text-align:left;white-space:normal;overflow-wrap:anywhere;max-width:100%;color:var(--ink)}
+.telegram-link{display:grid!important;place-items:center;flex:0 0 44px;width:44px;height:44px;border-radius:6px;border:1px solid var(--line-hi);color:var(--accent);background:var(--inset);box-shadow:inset 0 -2px 0 #0004}
+.telegram-link svg{width:20px;height:20px;filter:drop-shadow(var(--glow) var(--accent-dim))}
+.telegram-link:hover{background:var(--accent-dim)}
+.session-detail{font-size:12px;color:var(--muted)}.session-detail summary{cursor:pointer;color:var(--accent);font:12px var(--mono)}
+.session-detail .sid{white-space:normal;overflow-wrap:anywhere;margin-top:8px;overflow:visible;font-size:11px}
+.agent-rows td[data-label="Model"]>span{max-width:100%;white-space:normal;overflow-wrap:anywhere;font-family:var(--mono)!important;letter-spacing:.04em;border-radius:3px!important}
+.agent-rows td[data-label="Session age"]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.agent-rows td[data-label="Reported status"]>span{white-space:normal;max-width:100%;align-items:flex-start;font-weight:600}
 .agent-rows td[data-label="Reported status"] .flex-col{min-width:0;overflow-wrap:anywhere}
-.agent-rows td[data-label="Reported status"] .rounded-full{margin-top:5px}
-.agent-rows td[data-label="Model"]>span{max-width:100%;white-space:normal;overflow-wrap:anywhere}
+.agent-rows td[data-label="Reported status"] .rounded-full{margin-top:5px;width:9px;height:9px}
+/* Hardware keys for restart / stop / plugin actions. */
+.agent-rows button:not(.agent-name){min-width:40px;min-height:40px;border-radius:6px;border:1px solid var(--line-hi);background:var(--inset);padding:9px;box-shadow:inset 0 -2px 0 #0004;color:var(--muted)}
+.agent-rows .agent-act[data-act=stop]:hover{border-color:var(--bad)!important;color:var(--bad)!important}
+.agent-rows .agent-act:not([data-act=stop]):hover{border-color:var(--accent)!important;color:var(--accent)!important}
+.provider-lock{display:inline-grid;place-items:center;width:40px;height:40px;border:1px dashed var(--line-hi);border-radius:6px}
+.agent-rows td[colspan]{grid-column:1/-1;color:var(--muted);font-family:var(--mono)}
+/* Model chips: luminous outline in the dark theme instead of pastel blocks. */
+:root:not([data-theme=light]) .agent-rows td[data-label="Model"]>span{background:var(--inset)!important;border:1px solid currentColor}
+:root:not([data-theme=light]) #app .text-orange-700{color:#ffb27a}:root:not([data-theme=light]) #app .text-emerald-700{color:var(--good)}
+:root:not([data-theme=light]) #app .text-violet-700{color:#c9b0ff}:root:not([data-theme=light]) #app .text-amber-700{color:var(--amber)}
+:root:not([data-theme=light]) #app .text-rose-700{color:var(--bad)}
+/* Light theme chips: deeper ink keeps model labels above 4.5:1 on every deck surface. */
+:root[data-theme=light] #app .text-orange-700{color:#9a3412}:root[data-theme=light] #app .text-emerald-700{color:#065f46}
+:root[data-theme=light] #app .text-violet-700{color:#5b21b6}:root[data-theme=light] #app .text-amber-700{color:#7c4a03}
+:root[data-theme=light] #app .text-rose-700{color:#9f1239}
 /* Pastel name highlights need dark ink in both themes. */
 .agent-title .inline-block{color:#16253d}
+
+/* ---- stale snapshot: the deck dims and goes dashed; nothing stays falsely green -------- */
+#app[data-stale=true] section .svc-head{border-style:dashed!important}
+/* Only lights and data glow are dimmed; text keeps full-contrast ink in both themes. */
+#app[data-stale=true] .agent-rows>tr,#app[data-stale=true] .instrument{border-style:dashed!important}
+#app[data-stale=true] .agent-rows>tr:before{background:var(--warn)!important;box-shadow:none!important}
+#app[data-stale=true] .agent-rows .rounded-full,#app[data-stale=true] .svc-dot,#app[data-stale=true] .agent-avatar,#app[data-stale=true] .telegram-link svg{filter:grayscale(1);opacity:.55;box-shadow:none!important}
+#app[data-stale=true] .gauge .g-arc{stroke:var(--line-hi);filter:none}
+#app[data-stale=true] .mission-metrics strong,#app[data-stale=true] .mission-metrics>div.attn[data-alert=true] strong{color:var(--muted);text-shadow:none}
+#app[data-stale=true] .mission-metrics>div:before{background:var(--line-hi)}
+
+/* ---- service panels ---------------------------------------------------------------------- */
+#app .agents-note{margin-top:12px;font-family:var(--mono)}
+#app .svc-body>.grid>div,#app .svc-body>.p-4{border-radius:8px;border-color:var(--line-hi)!important;background:linear-gradient(160deg,var(--panel-raised),var(--panel))!important}
+#app .svc-body>.grid>div{padding:16px}
+#app .svc-body>.grid p:first-child,#app .svc-body h3{font:600 10px var(--mono)!important;letter-spacing:.2em;color:var(--amber)!important;text-transform:uppercase}
+#app .svc-body>.grid .text-lg{font:500 26px var(--mono)!important;font-variant-numeric:tabular-nums;color:var(--accent)}
+#app .svc-rows-wrap{border-radius:8px}#app .svc-rows-wrap table{min-width:680px}
+#app .svc-rows-wrap th{font-family:var(--mono);letter-spacing:.14em;color:var(--amber)!important}
+#app .svc-timeline>div{border-radius:1px}
+#footer{margin-top:28px!important;font:11px var(--mono)!important;letter-spacing:.08em}
+#toast{background:var(--panel-raised)!important;color:var(--ink)!important;border:1px solid var(--accent);border-radius:6px!important;padding:12px 18px!important;max-width:90vw;font-family:var(--mono);box-shadow:var(--glow) var(--accent-dim),var(--shadow)!important}
+
+/* ---- interaction ---------------------------------------------------------------------------- */
+button,a,summary,[role=button]{touch-action:manipulation}button,a,summary{transition:background-color .16s ease,border-color .16s ease,color .16s ease}
+button:hover,a:hover{border-color:var(--accent)}:focus-visible{outline:2px solid var(--accent)!important;outline-offset:3px}
+@keyframes signal-change{0%{box-shadow:0 0 0 2px var(--accent),0 0 28px var(--accent-dim)}100%{box-shadow:var(--shadow)}}
+.agent-changed{animation:signal-change .8s ease-out}
+
+/* ---- responsive -------------------------------------------------------------------------- */
+@media(max-width:1020px){.deck-cluster{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.deck-cluster .mission-metrics{grid-column:1/-1;grid-row:1}}
+@media(max-width:760px){
+  #app{padding:16px 16px 20px}
+  .deck-canopy{flex-direction:column;padding:16px;gap:14px;border-radius:4px 4px 16px 16px}
+  .deck-insignia{flex-basis:42px;height:42px}
+  .deck-switches{justify-content:space-between}
+  .deck-clock{align-items:flex-start;padding:6px 12px}.deck-clock strong{font-size:17px}
+  .deck-cluster{grid-template-columns:1fr;gap:10px}
+  .mission-metrics{gap:8px;padding:14px}.mission-metrics>div{padding:12px 10px 10px}
+  .mission-metrics>div span{font-size:9px;letter-spacing:.08em}.mission-metrics strong{font-size:30px}
+  .gauge{flex-basis:96px;width:96px;height:96px}
+  section[data-svc] .agent-rows{grid-template-columns:1fr}
+  section[data-svc] .agent-rows>tr{padding:16px 16px 16px 20px;gap:12px 14px}
+  .svc-head{flex-wrap:wrap}.svc-head h2{font-size:13px!important}
+  .signal-note{align-items:flex-start;flex-direction:column;gap:8px}
+  .svc-body>.grid{gap:8px!important}#app .svc-body>.grid>div{padding:12px 8px}#app .svc-body>.grid .text-lg{font-size:19px!important}}
+@media(max-width:360px){section[data-svc] .agent-rows>tr{grid-template-columns:1fr}section[data-svc] .agent-rows td:first-child,section[data-svc] .agent-rows td[data-label="Controls"]{grid-column:1}}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}

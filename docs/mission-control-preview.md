@@ -1,4 +1,4 @@
-# Mission Control preview: 0.4.0.dev1
+# Mission Control preview: 0.4.0.dev2
 
 This candidate changes presentation and browser snapshot handling. It does not add an agent
 orchestrator, infer whether an agent is thinking, send Telegram probes, or change keepalive policy.
@@ -69,6 +69,22 @@ agents/bridges. Restore backed-up config/state only if those were separately cha
 release itself does not require restoring data. Keep the Git history: use a revert commit for
 source rollback, not force-pushing or deleting commits.
 
-Do not merge or tag a stable release while checks fail. `0.4.0.dev1` is a development version,
+Do not merge or tag a stable release while checks fail. `0.4.0.dev2` is a development version,
 not a claim of a production rollout. Cloudflare Tunnel/Access and shared task handoff are
 separate follow-up work.
+
+## Flight deck design (Claude)
+
+The visual layer is a spacecraft flight deck: amber marks instrument labels and bezels, cyan
+marks live data and controls. Rules that keep it honest:
+
+- The ring gauge ("Crew up · availability") is `up/total` from the latest snapshot (`alive && !needs_login`), the count
+  readouts are the same counters as before, and the poll bar counts down to the real next
+  scheduled `/api/state` request. The clock is the browser's local time.
+- Station rails reflect each agent's reported state (ok / login / down). A stale or failed
+  snapshot greys out lights, gauge arc and readout glow, turns rails amber and dashes borders;
+  text is never dimmed (measured ≥4.5:1 in both themes in the stale state).
+- Motion: one sweep when a snapshot arrives and the existing flash on a changed agent signal.
+  Both are removed under `prefers-reduced-motion`. No looping or decorative telemetry.
+- Typography uses locally installed fonts only (condensed display stack + monospace readouts);
+  no font requests. Behaviour, escaping, actions, confirmations and DOM hooks are unchanged.
