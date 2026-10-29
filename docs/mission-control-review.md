@@ -1,6 +1,6 @@
 # Mission Control candidate review record
 
-Candidate: 0.4.0.dev2, branch `feat/mission-control-dashboard`.
+Candidate: 0.4.0.dev3, branch `feat/mission-control-dashboard`.
 
 ## Independent reviews
 
@@ -76,3 +76,25 @@ tables are not folded into that gauge. The tmux-process count excludes daemons. 
 uses browser-local time, and the countdown follows the next scheduled polling callback;
 a manual refresh does not pretend to reschedule it. No new backend actions or auth changes
 were introduced by the cockpit design. The preview remains unmerged and undeployed.
+
+
+## Compact UX revision
+
+Claude implemented the compact visual/UX revision in local commit 4e58bd1, based on the
+previous candidate. Codex independently rendered 2/8/12/24 mixed-name fixture rosters and
+verified filtering, density and header boundaries. The implementation preserves the cockpit
+direction while reducing tracking, panel height and shape inconsistency.
+
+The independent audit identified four concrete regressions during development; Claude fixed
+all four and the reviewer reproduced the fixes in Chromium:
+
+- Empty filtered rosters no longer retain a stale matched/total count.
+- Adding/removing another provider table preserves the existing filter, focus and hidden rows.
+- Five provider columns no longer cause whole-page overflow near 861–900px.
+- Header instruments no longer overlap around 1181–1200px; acceptance checks actual
+  rectangles at 32 widths because clipped overflow concealed the original collision.
+
+The independent large-fleet check passed with 24 agents, including mobile views and a long
+name. Mixed-name density was 10/8/5 complete agents at 1440x900, 1280x800 and 390x844, against
+2/2/0 in the prior preview. These are fixture layout results, not live server telemetry.
+The PR remains a visual-review draft; no production deployment was performed.

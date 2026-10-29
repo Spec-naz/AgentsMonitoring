@@ -60,13 +60,14 @@ AGENT_TABLE = r"""
       <span class="svc-chev text-slate-400 text-xs ml-2 select-none" title="collapse / expand">▾</span>
     </div>
     <div class="svc-body">
-    <div class="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+    <div class="roster-tools" hidden><input type="search" class="roster-filter" placeholder="Filter by name, model or status" aria-label="Filter agents by name, model or status" autocomplete="off"><span class="roster-count" aria-live="polite"></span></div>
+    <div class="roster-wrap rounded-lg border border-slate-200 bg-white overflow-x-auto">
       <table class="w-full text-sm" style="table-layout:fixed;min-width:680px"><colgroup><col style="width:21%"><col style="width:13%"><col style="width:32%"><col style="width:12%"><col style="width:14%"><col style="width:8%"></colgroup><thead>
         <tr class="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
           <th class="text-left font-medium px-2 py-2">Agent</th>
           <th class="text-left font-medium px-2 py-2">Model</th>
-          <th class="text-left font-medium px-2 py-2">Session ID / Port</th>
-          <th class="text-left font-medium px-2 py-2">Started</th>
+          <th class="text-left font-medium px-2 py-2">Session</th>
+          <th class="text-left font-medium px-2 py-2">Age</th>
           <th class="text-left font-medium px-2 py-2">Status</th>
           <th class="text-right font-medium px-2 py-2"></th>
         </tr></thead>
@@ -90,45 +91,37 @@ PAGE = r"""<!DOCTYPE html><html lang="en"><head>
 </head><body class="bg-slate-50 text-slate-800 antialiased">
 <div id="toast" class="fixed left-1/2 bottom-5 -translate-x-1/2 bg-slate-800 text-white text-sm px-2 py-1.5 rounded-md shadow-lg opacity-0 pointer-events-none" style="z-index:50">&nbsp;</div>
 <div id="app" class="mx-auto px-5 py-6" style="max-width:1200px">
-  <header class="deck-canopy">
-    <div class="deck-ident">
-      <span class="deck-insignia" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"><path d="M32 4 58 19v26L32 60 6 45V19z"/><path d="M32 16 46 24v16L32 48 18 40V24z" opacity=".55"/><circle cx="32" cy="32" r="5" fill="currentColor" stroke="none"/><path d="M32 4v12M58 45l-12-5M6 45l12-5" opacity=".55"/></svg></span>
-      <div><p class="eyebrow">Agents Monitoring · Flight deck</p><h1>Mission control</h1>
-      <p class="mission-sub">Crew status from this host. Every lit reading comes from the latest snapshot.</p></div>
-    </div>
-    <div class="deck-switches">
-      <div class="deck-clock"><span>Local time</span><strong id="deck-clock">--:--:--</strong></div>
-      <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
-    </div>
-  </header>
   <span id="connection-announcement" class="sr-only" role="status" aria-live="polite"></span>
-  <div class="deck-cluster" id="deck-cluster">
-    <div class="instrument gauge-panel">
-      <p class="instrument-label">Crew up <i>availability</i></p>
-      <div class="gauge-body">
+  <header class="deck" id="deck-cluster">
+    <div class="deck-ident">
+      <span class="deck-insignia" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="24" cy="24" r="19" opacity=".35"/><ellipse cx="24" cy="24" rx="21" ry="8" transform="rotate(-24 24 24)"/><circle cx="24" cy="24" r="6" fill="currentColor" stroke="none"/></svg></span>
+      <div class="deck-title"><h1>Mission control</h1><p class="eyebrow">Agents Monitoring · flight deck</p></div>
+    </div>
+    <div class="deck-instruments">
+      <div class="gauge-module">
         <svg class="gauge" id="gauge" data-level="none" viewBox="0 0 120 120" role="img" aria-label="Agents up: no snapshot yet">
-          <circle class="g-ticks" cx="60" cy="60" r="56"/>
           <circle class="g-track" cx="60" cy="60" r="46"/>
           <circle class="g-arc" id="gauge-arc" cx="60" cy="60" r="46" transform="rotate(-90 60 60)" stroke-dasharray="289.03" stroke-dashoffset="289.03"/>
-          <text id="gauge-value" x="60" y="64" text-anchor="middle">—</text>
-          <text class="g-sub" x="60" y="80" text-anchor="middle">UP / TOTAL</text>
+          <text id="gauge-value" x="60" y="71" text-anchor="middle">—</text>
         </svg>
-        <p class="gauge-caption"><strong id="gauge-caption">Awaiting snapshot</strong>Agents whose process or endpoint answered the last check.</p>
+        <div class="gauge-text"><span class="instrument-label" title="Agents whose process or endpoint answered the last check">Crew up · availability</span><strong id="gauge-caption">Awaiting snapshot</strong></div>
+      </div>
+      <div class="mission-metrics" aria-label="Native agent process overview">
+        <div title="Agents in the latest snapshot"><span>Observed</span><strong id="metric-agents">—</strong></div>
+        <div title="Tmux agent processes up (daemons excluded)"><span>Tmux up</span><strong id="metric-running">—</strong></div>
+        <div class="attn" id="metric-attention-box" title="Stopped, login required or incomplete data"><span>Attention</span><strong id="metric-attention">—</strong></div>
       </div>
     </div>
-    <div class="instrument mission-metrics" aria-label="Native agent process overview">
-      <p class="instrument-label">Crew manifest <i>live counts</i></p>
-      <div><span>Agents observed</span><strong id="metric-agents">—</strong></div>
-      <div><span>Tmux processes up</span><strong id="metric-running">—</strong></div>
-      <div class="attn" id="metric-attention-box"><span>Need attention</span><strong id="metric-attention">—</strong></div>
-    </div>
-    <div class="instrument link-panel">
-      <p class="instrument-label">Telemetry link <i id="poll-interval"></i></p>
+    <div class="deck-link">
       <div id="connection-state" role="status" aria-live="off" class="connection-state">Connecting · waiting for first snapshot</div>
-      <div class="poll-track" aria-hidden="true"><span id="poll-bar"></span></div>
-      <p class="poll-caption" id="poll-caption">Next scheduled snapshot pending</p>
+      <p class="poll-caption"><span id="poll-caption">Next scheduled snapshot pending</span> <span class="poll-interval" id="poll-interval"></span></p>
     </div>
-  </div>
+    <div class="deck-switches">
+      <div class="deck-clock" title="Local time"><strong id="deck-clock">--:--:--</strong></div>
+      <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
+    </div>
+    <div class="poll-track" aria-hidden="true"><span id="poll-bar"></span></div>
+  </header>
   <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
 AGENT_TABLES
   <div id="services"></div>
@@ -229,7 +222,7 @@ function updateConnection(){
   document.getElementById("poll-caption").textContent=refreshBusy?"Requesting snapshot…":`Next scheduled snapshot in ${left}s`;
 }
 let nextPoll=Date.now()+Number(POLL)*1000;
-document.getElementById("poll-interval").textContent=`every ${POLL}s`;
+document.getElementById("poll-interval").textContent=`· every ${POLL}s`;
 function renderGauge(agents){
   const up=agents.filter(a=>a.alive&&!a.needs_login).length, total=agents.length;
   const gauge=document.getElementById("gauge"), C=289.03;
@@ -334,6 +327,10 @@ function renderColumns(root,columns){
   const widths=[170,105,260,97,113,...columns.map(()=>100),65];
   q(root,"colgroup").innerHTML=columns.length?widths.map(w=>`<col style="width:${w}px">`).join(''):'<col style="width:21%"><col style="width:13%"><col style="width:32%"><col style="width:12%"><col style="width:14%"><col style="width:8%">';
   table.style.minWidth=(columns.length?810+columns.length*100:680)+"px";
+  // Provider columns join the roster grid as equal tracks (empty = no extra tracks).
+  table.style.setProperty("--plugin-cols", columns.map(()=>"minmax(88px,1fr)").join(" ")||"");
+  // Below this width the roster scrolls inside its own frame instead of widening the page.
+  table.style.setProperty("--roster-min", (840+102*columns.length)+"px");
 }
 function renderActions(a,table){
   const stopped=a.status==="Stopped (manual)";
@@ -365,14 +362,14 @@ function renderAgents(root, agents, summary=null, columns=[]){
     cnt.className="agents-count ml-auto text-sm font-medium "+state[2];
     q(root,".agents-note").textContent=summary.error||summary.note||"";
   }
-  if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;return;}
+  if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;applyFilter(root);return;}
   const openDetails=new Set([...tb.querySelectorAll("tr[data-agent] details[open]")].map(el=>el.closest("tr").dataset.agent));
   const focused=document.activeElement;
   const focusedRow=focused&&tb.contains(focused)?focused.closest("tr[data-agent]"):null;
   const focusState=focusedRow?{agent:focusedRow.dataset.agent,act:focused.dataset.act,
     selector:focused.matches(".agent-act")?".agent-act":focused.matches(".agent-name")?".agent-name":focused.matches("summary")?"summary":focused.matches(".sid")?".sid":focused.matches(".telegram-link")?".telegram-link":null}:null;
   tb.innerHTML="";
-  agents.forEach((a,index)=>{
+  agents.forEach(a=>{
     const tcls=VENDOR[a.vendor]||"bg-slate-100 text-slate-600";
     const copy=a.resume_cmd||a.session_id||"";
     const tip=copy?`${copy} (click to copy)`:"no resume";
@@ -395,6 +392,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
     const stCls=a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
     const tr=document.createElement("tr"); tr.dataset.agent=a.id||a.name; tr.className="border-b border-slate-100 last:border-0";
     tr.dataset.state=a.needs_login?"login":ok?"ok":"down";
+    tr.dataset.search=[a.name,a.label,statusTxt,a.telegram_bot,a.account].filter(Boolean).join(" ").toLowerCase();
     const signalKey=tr.dataset.agent;
     const signal=JSON.stringify([a.alive,a.needs_login,a.status]);
     if(priorSignals.has(signalKey)&&priorSignals.get(signalKey)!==signal)tr.classList.add("agent-changed");
@@ -412,7 +410,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
     const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" aria-label="Open @${esc(a.telegram_bot)} in Telegram" title="Open @${esc(a.telegram_bot)} in Telegram" class="telegram-link inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
     const recovery=a.restart_warning?`<br><span class="text-[11px] text-amber-600" title="${esc(a.restart_warning)}">⚠ Fresh conversation</span>`:"";
     tr.innerHTML=
-      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title"><span class="station-id">Station ${String(index+1).padStart(2,"0")}</span>${nameCell}${recovery}</div>${tg}</div></td>`+
+      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title">${nameCell}${recovery}</div>${tg}</div></td>`+
       `<td data-label="Model" class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
       `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary>Connection details</summary>${sid}</details></td>`+
       `<td data-label="Session age" class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
@@ -426,7 +424,20 @@ function renderAgents(root, agents, summary=null, columns=[]){
       if(target)target.focus({preventScroll:true});
     }
   });
+  applyFilter(root);
 }
+// Roster filter: offered once a roster is larger than one screen of stations (or while in use).
+const FILTER_FROM=9;
+function applyFilter(root){
+  const tools=q(root,".roster-tools"), input=q(root,".roster-filter"); if(!tools||!input) return;
+  const rows=[...root.querySelectorAll(".agent-rows > tr[data-agent]")];
+  const term=input.value.trim().toLowerCase();
+  tools.hidden=rows.length<FILTER_FROM&&!term;
+  let shown=0;
+  rows.forEach(tr=>{const hit=!term||(tr.dataset.search||"").includes(term); tr.hidden=!hit; if(hit)shown++;});
+  q(root,".roster-count").textContent=term?`${shown} of ${rows.length} shown`:`${rows.length} agents`;
+}
+document.addEventListener("input",e=>{ if(e.target.matches(".roster-filter")) applyFilter(e.target.closest("section")); });
 // Collapsible blocks. The first OPEN_BY_DEFAULT blocks (agents table + the first service cards)
 // start expanded, the rest fold to their header line; a click on any header toggles it and the
 // choice is remembered per block in localStorage (a long list of modules stays scannable).
@@ -469,17 +480,20 @@ async function refresh(){
     const agentsRoot=document.querySelector('section[data-svc="agents"]');
     renderAgents(agentsRoot, d.agents, null, d.columns||[]); initCollapse(agentsRoot,"agents",0);
     const tables=document.getElementById("plugin-tables");
-    const wanted=(d.agent_tables||[]).map(t=>t.id).join("|");
-    if(tables.dataset.keys!==wanted){
-      tables.innerHTML="";
-      (d.agent_tables||[]).forEach(t=>{
-        const root=document.getElementById("agent-table-tpl").content.firstElementChild.cloneNode(true);
-        root.dataset.svc=t.id; tables.appendChild(root);
-      });
-      tables.dataset.keys=wanted;
-    }
+    // Keyed by table id: a provider table added or removed elsewhere must not rebuild the others
+    // (their filter text, open details and keyboard focus live in those nodes).
+    const wantedIds=new Set((d.agent_tables||[]).map(t=>t.id));
+    [...tables.children].forEach(n=>{ if(!wantedIds.has(n.dataset.svc)) n.remove(); });   // drop first, so kept nodes need not move
+    const existing=new Map([...tables.children].map(n=>[n.dataset.svc,n]));
+    const ordered=(d.agent_tables||[]).map((t,i)=>{
+      let root=existing.get(t.id);
+      if(!root){root=document.getElementById("agent-table-tpl").content.firstElementChild.cloneNode(true);root.dataset.svc=t.id;}
+      existing.delete(t.id);
+      if(tables.children[i]!==root) tables.insertBefore(root, tables.children[i]||null);
+      return root;
+    });
     (d.agent_tables||[]).forEach((t,i)=>{
-      const root=tables.children[i]; q(root,"h2").textContent=t.title;
+      const root=ordered[i]; q(root,"h2").textContent=t.title;
       renderAgents(root,t.rows,t,d.columns||[]); initCollapse(root,t.id,i+1);
     });
     document.getElementById("plugin-loading").hidden=!d.plugin_loading;

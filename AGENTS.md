@@ -4,6 +4,8 @@
   submit a PR with the problem, resulting behavior, validation and material limitations.
 - Claude owns dashboard visual design and implementation; Codex handles technical integration,
   verification and GitHub publication. The user visual direction is a spaceship cockpit/control panel.
+- UI/UX should use coherent softer shapes, natural text spacing and compact agent rosters.
+  Evaluate larger fleets (12/24 agents) as well as two-agent examples, including mobile.
 - Preserve the dependency-free runtime unless a concrete requirement justifies a change.
 - The user requests collaboration with Claude: use an independent review of substantial
   changes. Record findings and their resolution. Do not claim review approval when it is

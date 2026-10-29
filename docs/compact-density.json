@@ -1,0 +1,132 @@
+{
+  "candidate": "0.4.0.dev3",
+  "environment": "Chromium on Linux, local synthetic fixture; results depend on font/names/extra columns/details",
+  "fixture": "2/8/12/24 agents with mixed states and a long descriptive name",
+  "previous_dev2_large_roster": {
+    "1440x900": 2,
+    "1280x800": 2,
+    "390x844": 0
+  },
+  "measurements": [
+    {
+      "agents": 2,
+      "width": 1440,
+      "height": 900,
+      "fully_visible": 2,
+      "total": 2,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 2,
+      "width": 1280,
+      "height": 800,
+      "fully_visible": 2,
+      "total": 2,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 2,
+      "width": 390,
+      "height": 844,
+      "fully_visible": 2,
+      "total": 2,
+      "overflow": false,
+      "first_row_height": 91,
+      "name_font": "14px"
+    },
+    {
+      "agents": 8,
+      "width": 1440,
+      "height": 900,
+      "fully_visible": 8,
+      "total": 8,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 8,
+      "width": 1280,
+      "height": 800,
+      "fully_visible": 8,
+      "total": 8,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 8,
+      "width": 390,
+      "height": 844,
+      "fully_visible": 5,
+      "total": 8,
+      "overflow": false,
+      "first_row_height": 91,
+      "name_font": "14px"
+    },
+    {
+      "agents": 12,
+      "width": 1440,
+      "height": 900,
+      "fully_visible": 10,
+      "total": 12,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 12,
+      "width": 1280,
+      "height": 800,
+      "fully_visible": 8,
+      "total": 12,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 12,
+      "width": 390,
+      "height": 844,
+      "fully_visible": 5,
+      "total": 12,
+      "overflow": false,
+      "first_row_height": 91,
+      "name_font": "14px"
+    },
+    {
+      "agents": 24,
+      "width": 1440,
+      "height": 900,
+      "fully_visible": 10,
+      "total": 24,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 24,
+      "width": 1280,
+      "height": 800,
+      "fully_visible": 8,
+      "total": 24,
+      "overflow": false,
+      "first_row_height": 56,
+      "name_font": "14px"
+    },
+    {
+      "agents": 24,
+      "width": 390,
+      "height": 844,
+      "fully_visible": 5,
+      "total": 24,
+      "overflow": false,
+      "first_row_height": 91,
+      "name_font": "14px"
+    }
+  ]
+}

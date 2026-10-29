@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0.dev3 (2026-10-29) — Compact Flight Deck preview
+
+- Claude unified the cockpit shapes and softened the panels, replaced widely spaced display typography with natural sans text and reduced station height.
+- The instrument cluster now shares one compact console. Larger rosters offer filtering by name, model or status; connection details remain expandable.
+- Preserve filter text and keyboard focus across polling and unrelated provider-table additions/removals. Correct empty filtered counts and contain extra provider columns within the roster.
+- Check header rectangles at 32 desktop/mobile widths to prevent concealed overlap. Add compact-roster browser acceptance to CI.
+- Independent density evidence with mixed long names: 10 complete stations at 1440x900, 8 at 1280x800, and 5 at 390x844, compared with 2/2/0 in dev2. This is a development preview; production is unchanged.
+
+## Unreleased — compact flight deck (Claude design iteration)
+
+- One console for identity, instruments, telemetry link and switches (≈104–157 px tall instead of ≈360 px); layout follows the app's own width via a container query, so instruments never overlap (rect-checked 1440–320 px).
+- Agents become compact station rows aligned like a table (56 px each): state-lit avatar ring, name, Telegram key, model pill, status, age, expandable connection details and action keys. Measured with fixture crews: 10 complete stations visible at 1440×900, 8 at 1280×800, 5 at 390×844.
+- One shape language (16/12/10 px radii, pill chips), natural sentence-case typography without wide letter-spacing; monospace only for numbers.
+- Roster filter appears for crews of 9+ (or while in use); filter text and focus survive refreshes and provider tables added/removed elsewhere (provider tables are now reused by id).
+- Wide provider columns scroll inside the roster frame instead of widening the page.
+- New fixture browser check `tests/verify_compact_browser.py`.
+
 ## 0.4.0.dev2 (2026-10-29) — Flight Deck preview
 
 - Claude designed and implemented a spaceship cockpit: instrument bezels, crew availability gauge, station panels, clock, hardware-style controls and amber/cyan accents in dark/light themes.

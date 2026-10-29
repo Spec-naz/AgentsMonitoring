@@ -1,4 +1,4 @@
-# Mission Control preview: 0.4.0.dev2
+# Mission Control preview: 0.4.0.dev3
 
 This candidate changes presentation and browser snapshot handling. It does not add an agent
 orchestrator, infer whether an agent is thinking, send Telegram probes, or change keepalive policy.
@@ -69,7 +69,7 @@ agents/bridges. Restore backed-up config/state only if those were separately cha
 release itself does not require restoring data. Keep the Git history: use a revert commit for
 source rollback, not force-pushing or deleting commits.
 
-Do not merge or tag a stable release while checks fail. `0.4.0.dev2` is a development version,
+Do not merge or tag a stable release while checks fail. `0.4.0.dev3` is a development version,
 not a claim of a production rollout. Cloudflare Tunnel/Access and shared task handoff are
 separate follow-up work.
 
@@ -88,3 +88,36 @@ marks live data and controls. Rules that keep it honest:
   Both are removed under `prefers-reduced-motion`. No looping or decorative telemetry.
 - Typography uses locally installed fonts only (condensed display stack + monospace readouts);
   no font requests. Behaviour, escaping, actions, confirmations and DOM hooks are unchanged.
+
+## Compact flight deck (Claude, iteration 3)
+
+- Agents are station rows (desktop) and two-line stations (≤860 px). Primary data stays visible:
+  state ring, name, Telegram, model, status, age, keys. Session id/port live in expandable details.
+- Density measured on fixture crews of 2/8/12/24: 1440×900 → 10 complete rows, 1280×800 → 8,
+  390×844 → 5. Fixture data only; no real measurements are implied.
+- Trade-offs: on phones the action keys share the first line with the name, so names longer than
+  ~18 characters wrap to two lines (still fully readable). At 1280 px and below the console uses
+  two rows, costing ≈40 px of vertical space to keep every instrument at its natural size.
+- The roster filter matches name, model, status, Telegram bot and account; it hides nothing
+  silently (count shows "x of y shown").
+
+
+## Compact roster UX
+
+The console uses shared rounded shapes and regular sans text rather than wide tracking and
+all-caps readouts. Agent names remain 14px in the desktop fixture. Dense rows retain model,
+status, age, Telegram and controls; session details expand on demand. At nine or more rows,
+a search field filters by name/model/status (also bot/account metadata). A filter already in
+use remains available when the roster shrinks. Global instrument counts continue describing
+the entire snapshot, while the roster explicitly reports the matched count.
+
+Per-table filter state and input focus survive ordinary polling and unrelated provider table
+additions/removals. Additional provider columns scroll inside a bounded roster on narrow
+desktops; phone layouts wrap the information. Production data and agent activity are not
+modified by filtering.
+
+Run `python3 tests/verify_compact_browser.py --out /tmp/compact-evidence` for density, filtering,
+empty states, provider changes, column containment and header overlap acceptance. Independent
+fixture measurements with 2/8/12/24 agents recorded 10 full rows at 1440x900, 8 at 1280x800 and
+5 at 390x844 when the roster was large; dev2 showed 2/2/0 at the same viewports. Long names
+can increase row height. Extra provider columns and expanded details also affect density.
