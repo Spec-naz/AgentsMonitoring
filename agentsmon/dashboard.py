@@ -60,13 +60,14 @@ AGENT_TABLE = r"""
       <span class="svc-chev text-slate-400 text-xs ml-2 select-none" title="collapse / expand">▾</span>
     </div>
     <div class="svc-body">
-    <div class="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+    <div class="roster-tools" hidden><input type="search" class="roster-filter" placeholder="Filter by name, model or status" aria-label="Filter agents by name, model or status" autocomplete="off"><span class="roster-count" aria-live="polite"></span></div>
+    <div class="roster-wrap rounded-lg border border-slate-200 bg-white overflow-x-auto">
       <table class="w-full text-sm" style="table-layout:fixed;min-width:680px"><colgroup><col style="width:21%"><col style="width:13%"><col style="width:32%"><col style="width:12%"><col style="width:14%"><col style="width:8%"></colgroup><thead>
         <tr class="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
           <th class="text-left font-medium px-2 py-2">Agent</th>
           <th class="text-left font-medium px-2 py-2">Model</th>
-          <th class="text-left font-medium px-2 py-2">Session ID / Port</th>
-          <th class="text-left font-medium px-2 py-2">Started</th>
+          <th class="text-left font-medium px-2 py-2">Session</th>
+          <th class="text-left font-medium px-2 py-2">Age</th>
           <th class="text-left font-medium px-2 py-2">Status</th>
           <th class="text-right font-medium px-2 py-2"></th>
         </tr></thead>
@@ -78,16 +79,72 @@ AGENT_TABLE = r"""
   </section>"""
 
 
+_MISSION_CSS = (Path(__file__).parent / "static" / "dashboard.css").read_text("utf-8")
+
 PAGE = r"""<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agents Monitoring</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
 <script src="/static/tailwind.js"></script>
 <style>.bar{transition:opacity .15s ease}.bar:hover{opacity:.65}.copied-flash{color:#059669!important;transition:color .1s}#toast{transition:opacity .2s ease}.agent-rows td{overflow:hidden}.sid{display:block;overflow:hidden;text-overflow:ellipsis}</style>
+<style>MISSION_CSS</style>
 </head><body class="bg-slate-50 text-slate-800 antialiased">
 <div id="toast" class="fixed left-1/2 bottom-5 -translate-x-1/2 bg-slate-800 text-white text-sm px-2 py-1.5 rounded-md shadow-lg opacity-0 pointer-events-none" style="z-index:50">&nbsp;</div>
-<div id="app" class="mx-auto px-5 py-6" style="max-width:850px">
+<div id="app" class="mx-auto px-5 py-6" style="max-width:1200px">
+  <span id="connection-announcement" class="sr-only" role="status" aria-live="polite"></span>
+  <header class="deck" id="deck-cluster">
+    <div class="deck-ident">
+      <span class="deck-insignia" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="24" cy="24" r="19" opacity=".35"/><ellipse cx="24" cy="24" rx="21" ry="8" transform="rotate(-24 24 24)"/><circle cx="24" cy="24" r="6" fill="currentColor" stroke="none"/></svg></span>
+      <div class="deck-title"><h1>Mission control</h1><p class="eyebrow">Agents Monitoring · flight deck</p></div>
+    </div>
+    <div class="deck-instruments">
+      <div class="gauge-module">
+        <svg class="gauge" id="gauge" data-level="none" viewBox="0 0 120 120" role="img" aria-label="Agents up: no snapshot yet">
+          <circle class="g-track" cx="60" cy="60" r="46"/>
+          <circle class="g-arc" id="gauge-arc" cx="60" cy="60" r="46" transform="rotate(-90 60 60)" stroke-dasharray="289.03" stroke-dashoffset="289.03"/>
+          <text id="gauge-value" x="60" y="71" text-anchor="middle">—</text>
+        </svg>
+        <div class="gauge-text"><span class="instrument-label" title="Agents whose process or endpoint answered the last check">Crew up · availability</span><strong id="gauge-caption">Awaiting snapshot</strong></div>
+      </div>
+      <div class="mission-metrics" aria-label="Native agent process overview">
+        <div title="Agents in the latest snapshot"><span>Observed</span><strong id="metric-agents">—</strong></div>
+        <div title="Tmux agent processes up (daemons excluded)"><span>Tmux up</span><strong id="metric-running">—</strong></div>
+        <div class="attn" id="metric-attention-box" title="Stopped, login required or incomplete data"><span>Attention</span><strong id="metric-attention">—</strong></div>
+      </div>
+    </div>
+    <div class="deck-link">
+      <div id="connection-state" role="status" aria-live="off" class="connection-state">Connecting · waiting for first snapshot</div>
+      <p class="poll-caption"><span id="poll-caption">Next scheduled snapshot pending</span> <span class="poll-interval" id="poll-interval"></span></p>
+    </div>
+    <div class="deck-switches">
+      <div class="deck-clock" title="Local time"><strong id="deck-clock">--:--:--</strong></div>
+      <button id="theme-toggle" type="button" aria-label="Switch to light theme">Light mode</button>
+    </div>
+    <div class="poll-track" aria-hidden="true"><span id="poll-bar"></span></div>
+  </header>
+  <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
 AGENT_TABLES
+  <section id="eco" class="eco mb-6" aria-label="Security and ecosystem">
+    <div class="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 bg-white border-slate-200">
+      <span class="svc-dot h-3 w-3 rounded-full bg-slate-300 shrink-0"></span>
+      <h2 class="text-base font-semibold">Security &amp; ecosystem</h2>
+      <span class="eco-summary ml-auto text-sm font-medium text-slate-400">not scanned yet</span>
+      <span class="svc-chev text-slate-400 text-xs ml-2 select-none" title="collapse / expand">▾</span>
+    </div>
+    <div class="svc-body">
+      <div class="eco-toolbar">
+        <div class="eco-tabs" role="tablist" aria-label="Security and ecosystem views">
+          <button type="button" role="tab" data-eco-tab="security" aria-selected="true">Security</button>
+          <button type="button" role="tab" data-eco-tab="access" aria-selected="false">Access</button>
+          <button type="button" role="tab" data-eco-tab="ecosystem" aria-selected="false">Ecosystem</button>
+        </div>
+        <span class="eco-meta"></span>
+        <button type="button" class="eco-rescan">Rescan</button>
+      </div>
+      <div class="eco-panel" role="tabpanel" aria-live="polite"><p class="eco-empty">Waiting for the first scan…</p></div>
+      <ul class="eco-limits"></ul>
+    </div>
+  </section>
   <div id="services"></div>
   <p class="text-center text-[11px] text-slate-300" id="footer">auto-refresh</p>
 </div>
@@ -151,6 +208,56 @@ AGENT_TABLES
 </template>
 
 <script>
+function applyTheme(theme){
+  document.documentElement.dataset.theme=theme;
+  const btn=document.getElementById("theme-toggle");
+  btn.textContent=theme==="dark"?"Light mode":"Dark mode";
+  btn.setAttribute("aria-label", "Switch to "+(theme==="dark"?"light":"dark")+" theme");
+}
+let savedTheme="dark";
+try{savedTheme=localStorage.getItem("agentsmon.theme")||"dark";}catch(e){}
+applyTheme(savedTheme==="light"?"light":"dark");
+document.getElementById("theme-toggle").addEventListener("click",()=>{
+  const theme=document.documentElement.dataset.theme==="dark"?"light":"dark";
+  applyTheme(theme);try{localStorage.setItem("agentsmon.theme",theme);}catch(e){}
+});
+let lastSnapshot=0, refreshBusy=false, connectionFailed=false, announcedConnection=null;
+const staleAfter=Math.max(30, Number(POLL)*3)*1000;
+const requestTimeoutMs=Number("REQUEST_TIMEOUT")*1000||120000;
+function updateConnection(){
+  const failed=connectionFailed;
+  const age=lastSnapshot?Math.max(0,Math.floor((Date.now()-lastSnapshot)/1000)):null;
+  const stale=failed||!lastSnapshot||Date.now()-lastSnapshot>staleAfter;
+  document.getElementById("app").dataset.stale=stale?"true":"false";
+  const el=document.getElementById("connection-state");
+  el.dataset.state=stale?"stale":"fresh";
+  if(announcedConnection!==stale&&(lastSnapshot||connectionFailed)){
+    document.getElementById("connection-announcement").textContent=stale?"Dashboard data unavailable or stale":"Dashboard snapshot received";
+    announcedConnection=stale;
+  }
+  el.textContent=stale?(lastSnapshot?`Snapshot stale · last received ${age}s ago${failed?" · connection failed":""}`:"No snapshot available · connecting or retrying"):`Snapshot received ${age}s ago · refresh every ${POLL}s`;
+  // Deck clock and the poll bar show real time and the real refresh schedule — nothing simulated.
+  document.getElementById("deck-clock").textContent=new Date().toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  const left=Math.max(0,Math.ceil((nextPoll-Date.now())/1000));
+  document.getElementById("poll-bar").style.transform=`scaleX(${Math.min(1,1-left/Number(POLL))})`;
+  document.getElementById("poll-caption").textContent=refreshBusy?"Requesting snapshot…":`Next scheduled snapshot in ${left}s`;
+}
+let nextPoll=Date.now()+Number(POLL)*1000;
+document.getElementById("poll-interval").textContent=`· every ${POLL}s`;
+function renderGauge(agents){
+  const up=agents.filter(a=>a.alive&&!a.needs_login).length, total=agents.length;
+  const gauge=document.getElementById("gauge"), C=289.03;
+  gauge.dataset.level=!total?"none":up===total?"full":up?"partial":"down";
+  document.getElementById("gauge-arc").setAttribute("stroke-dashoffset", String(total?C*(1-up/total):C));
+  document.getElementById("gauge-value").textContent=`${up}/${total}`;
+  gauge.setAttribute("aria-label", `Agents up: ${up} of ${total}`);
+  document.getElementById("gauge-caption").textContent=!total?"No agents observed":up===total?"All agents up":up?`${total-up} not up`:"No agent up";
+}
+function sweepDeck(){
+  const deck=document.getElementById("deck-cluster");
+  deck.classList.remove("deck-sweep"); void deck.offsetWidth; deck.classList.add("deck-sweep");
+}
+setInterval(()=>updateConnection(),1000);
 const STATE = {
   operational: ["bg-emerald-500", "Operational", "text-emerald-600", "bg-emerald-50 border-emerald-200"],
   outage:      ["bg-rose-500", "Outage", "text-rose-600", "bg-rose-50 border-rose-200"],
@@ -241,6 +348,10 @@ function renderColumns(root,columns){
   const widths=[170,105,260,97,113,...columns.map(()=>100),65];
   q(root,"colgroup").innerHTML=columns.length?widths.map(w=>`<col style="width:${w}px">`).join(''):'<col style="width:21%"><col style="width:13%"><col style="width:32%"><col style="width:12%"><col style="width:14%"><col style="width:8%">';
   table.style.minWidth=(columns.length?810+columns.length*100:680)+"px";
+  // Provider columns join the roster grid as equal tracks (empty = no extra tracks).
+  table.style.setProperty("--plugin-cols", columns.map(()=>"minmax(88px,1fr)").join(" ")||"");
+  // Below this width the roster scrolls inside its own frame instead of widening the page.
+  table.style.setProperty("--roster-min", (840+102*columns.length)+"px");
 }
 function renderActions(a,table){
   const stopped=a.status==="Stopped (manual)";
@@ -248,18 +359,21 @@ function renderActions(a,table){
     stopped?{id:"stop",label:"Remove "+a.name,icon:"stop",confirm:`Remove agent "${a.name}" from Agents Monitoring? Its conversation files stay on disk.`}
            :{id:"stop",label:"Stop "+a.name,icon:"stop"}]);
   const paths={restart:'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',stop:'M18 6 6 18M6 6l12 12',run:'M8 5l11 7-11 7z'};
-  const buttons=defs.map(x=>`<button class="agent-act inline-flex align-middle p-1 rounded text-slate-400 ${x.icon==='stop'?'ml-0.5 hover:text-rose-600 hover:bg-rose-50':'hover:text-sky-600 hover:bg-slate-100'}" data-act="${esc(x.id)}" data-name="${esc(a.name)}" ${a.plugin?`data-table="${esc(table)}" data-row="${esc(a.id)}"`:''} data-confirm="${esc(x.confirm||'')}" title="${esc(x.label)}"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[x.icon]||paths.run}"/></svg></button>`).join("");
-  return buttons+((a.actions===false||a.actions_locked)?'<span class="text-xs text-slate-300 ml-0.5 align-middle" title="Actions controlled by the provider">🔒</span>':'');
+  const buttons=defs.map(x=>`<button class="agent-act inline-flex align-middle p-1 rounded text-slate-400 ${x.icon==='stop'?'ml-0.5 hover:text-rose-600 hover:bg-rose-50':'hover:text-sky-600 hover:bg-slate-100'}" data-act="${esc(x.id)}" data-name="${esc(a.name)}" ${a.plugin?`data-table="${esc(table)}" data-row="${esc(a.id)}"`:''} data-confirm="${esc(x.confirm||'')}" aria-label="${esc(x.label)}" title="${esc(x.label)}"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${paths[x.icon]||paths.run}"/></svg></button>`).join("");
+  return buttons+((a.actions===false||a.actions_locked)?'<span class="provider-lock text-xs text-slate-300 ml-0.5 align-middle" role="img" aria-label="Actions controlled by the provider" title="Actions controlled by the provider"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>':'');
 }
+const previousAgentSignals=new WeakMap();
 function renderAgents(root, agents, summary=null, columns=[]){
   renderColumns(root, columns);
+  const priorSignals=previousAgentSignals.get(root)||new Map(), nextSignals=new Map();
+  previousAgentSignals.set(root,nextSignals);
   const tb=q(root,".agent-rows");
   const on=agents.some(a=>a.alive&&!a.needs_login); const running=agents.filter(a=>a.alive&&!a.needs_login).length;
   q(root,".svc-head").className="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 cursor-pointer "+(on?"bg-emerald-50 border-emerald-200":"bg-white border-slate-200");
   q(root,".svc-dot").className="svc-dot h-3 w-3 rounded-full shrink-0 "+(on?"bg-emerald-500":"bg-slate-300");
   const cnt=q(root,".agents-count");
-  // Use the same health summary for every provider's table.
-  cnt.textContent=`${running}/${agents.length} healthy`;
+  // Native liveness is a process observation, not end-to-end health.
+  cnt.textContent=`${running}/${agents.length} available`;
   cnt.className="agents-count ml-auto text-sm font-medium "+(agents.length&&running===agents.length?"text-emerald-600":running?"text-amber-600":"text-slate-400");
   if(summary){
     const state=summary.up?STATE.operational:(summary.rows.length||summary.error?STATE.outage:STATE.nodata);
@@ -269,7 +383,12 @@ function renderAgents(root, agents, summary=null, columns=[]){
     cnt.className="agents-count ml-auto text-sm font-medium "+state[2];
     q(root,".agents-note").textContent=summary.error||summary.note||"";
   }
-  if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;return;}
+  if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;applyFilter(root);return;}
+  const openDetails=new Set([...tb.querySelectorAll("tr[data-agent] details[open]")].map(el=>el.closest("tr").dataset.agent));
+  const focused=document.activeElement;
+  const focusedRow=focused&&tb.contains(focused)?focused.closest("tr[data-agent]"):null;
+  const focusState=focusedRow?{agent:focusedRow.dataset.agent,act:focused.dataset.act,
+    selector:focused.matches(".agent-act")?".agent-act":focused.matches(".agent-name")?".agent-name":focused.matches("summary")?"summary":focused.matches(".sid")?".sid":focused.matches(".telegram-link")?".telegram-link":null}:null;
   tb.innerHTML="";
   agents.forEach(a=>{
     const tcls=VENDOR[a.vendor]||"bg-slate-100 text-slate-600";
@@ -277,20 +396,28 @@ function renderAgents(root, agents, summary=null, columns=[]){
     const tip=copy?`${copy} (click to copy)`:"no resume";
     let sid;
     if(a.session_id){
-      sid=`<span class="sid font-mono text-xs text-slate-600 whitespace-nowrap cursor-pointer hover:text-sky-600" title="${esc(tip)}" data-copy="${esc(copy)}">${esc(a.session_id)}</span>`;
+      sid=`<span tabindex="0" role="button" class="sid font-mono text-xs text-slate-600 whitespace-nowrap cursor-pointer hover:text-sky-600" title="${esc(tip)}" data-copy="${esc(copy)}">${esc(a.session_id)}</span>`;
     }else if(a.kind==="daemon" && a.port){
       // Daemons (gateways) have no session id — show the port they actually listen on instead.
-      sid=`<span class="font-mono text-xs text-slate-500 whitespace-nowrap" title="gateway port">:${a.port}</span>`;
+      sid=`<span class="font-mono text-xs text-slate-500 whitespace-nowrap" title="gateway port">:${esc(a.port)}</span>`;
     }else{
       sid=`<span class="text-xs text-slate-300 cursor-help" title="${esc(tip)}">— none</span>`;
     }
     const ok=a.alive&&!a.needs_login; const dot=a.needs_login?"bg-amber-500":(ok?"bg-emerald-500":(a.plugin?"bg-rose-500":"bg-slate-300"));
     // Health is the visible status for every agent; latency is supplementary detail.
-    const statusTxt=a.status||(ok?"Running":"Idle");
+    const fallbackStatus=a.needs_login?"Login required":a.plugin?(ok?"Available":"Unavailable"):
+      a.kind==="daemon"&&a.health_url?(ok?"Endpoint responding":"Endpoint unavailable"):(ok?"Process running":"Process stopped");
+    const statusTxt=(!a.plugin&&a.status==="Running"?fallbackStatus:a.status)||fallbackStatus;
     const statusTip=[a.status_detail||a.status,
       ok&&a.latency_ms!=null?`latency ${fmtLat(a.latency_ms)}`:""].filter(Boolean).join(" · ");
     const stCls=a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
-    const tr=document.createElement("tr"); tr.className="border-b border-slate-100 last:border-0";
+    const tr=document.createElement("tr"); tr.dataset.agent=a.id||a.name; tr.className="border-b border-slate-100 last:border-0";
+    tr.dataset.state=a.needs_login?"login":ok?"ok":"down";
+    tr.dataset.search=[a.name,a.label,statusTxt,a.telegram_bot,a.account].filter(Boolean).join(" ").toLowerCase();
+    const signalKey=tr.dataset.agent;
+    const signal=JSON.stringify([a.alive,a.needs_login,a.status]);
+    if(priorSignals.has(signalKey)&&priorSignals.get(signalKey)!==signal)tr.classList.add("agent-changed");
+    nextSignals.set(signalKey,signal);
     const nameBg=NAME_BG[a.name_color];
     const nameInner=nameBg?`<span class="inline-block rounded px-1.5 py-0.5 ${nameBg}">${esc(a.name)}</span>`:esc(a.name);
     // Only tmux agents can be attached to; daemons (kind "daemon", e.g. OpenClaw/Hermes) aren't in
@@ -298,22 +425,40 @@ function renderAgents(root, agents, summary=null, columns=[]){
     // column width never jumps).
     const attachCmd=`tmux attach -t "${a.tmux_session||a.name}"`;
     const nameCell=(a.kind!=="daemon")
-      ? `<span class="agent-name cursor-pointer hover:text-sky-600" data-copy="${esc(attachCmd)}" title="${esc(attachCmd)} (click to copy)">${nameInner}</span>`
+      ? `<button type="button" class="agent-name cursor-pointer hover:text-sky-600" data-copy="${esc(attachCmd)}" title="${esc(attachCmd)} (click to copy)">${nameInner}</button>`
       : nameInner;
     // Telegram deep-link icon for agents bridged to a bot (opens t.me/<bot> in a new tab).
-    const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" title="Open @${esc(a.telegram_bot)} in Telegram" class="inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="#229ED9"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
+    const tg=a.telegram_url?` <a href="${esc(a.telegram_url)}" target="_blank" rel="noopener" aria-label="Open @${esc(a.telegram_bot)} in Telegram" title="Open @${esc(a.telegram_bot)} in Telegram" class="telegram-link inline-flex align-middle ml-1 hover:opacity-70"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.27 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a>`:"";
     const recovery=a.restart_warning?`<br><span class="text-[11px] text-amber-600" title="${esc(a.restart_warning)}">⚠ Fresh conversation</span>`:"";
     tr.innerHTML=
-      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap">${nameCell}${tg}${recovery}</td>`+
-      `<td class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
-      `<td class="px-2 py-1.5">${sid}</td>`+
-      `<td class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
-      `<td class="px-2 py-1.5" title="${esc(statusTip)}"><span class="inline-flex items-center gap-1.5 whitespace-nowrap ${stCls}"><span class="h-2 w-2 rounded-full ${dot} shrink-0"></span><span class="flex flex-col">${esc(statusTxt)}</span></span></td>`+
-      columns.map(c=>`<td class="px-2 py-1.5 text-xs">${renderCell((a.cells||{})[c.id])}</td>`).join("")+
-      `<td class="px-2 py-1.5 text-right whitespace-nowrap">${renderActions(a, root.dataset.svc)}</td>`;
+      `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title">${nameCell}${recovery}</div>${tg}</div></td>`+
+      `<td data-label="Model" class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600">Incomplete data</span>':""}</td>`+
+      `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary>Connection details</summary>${sid}</details></td>`+
+      `<td data-label="Session age" class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):"–"}</td>`+
+      `<td data-label="Reported status" class="px-2 py-1.5" title="${esc(statusTip)}"><span class="inline-flex items-center gap-1.5 whitespace-nowrap ${stCls}"><span class="h-2 w-2 rounded-full ${dot} shrink-0"></span><span class="flex flex-col">${esc(statusTxt)}</span></span></td>`+
+      columns.map(c=>`<td data-label="${esc(c.title||c.id)}" class="px-2 py-1.5 text-xs">${renderCell((a.cells||{})[c.id])}</td>`).join("")+
+      `<td data-label="Controls" class="px-2 py-1.5 text-right whitespace-nowrap">${renderActions(a, root.dataset.svc)}</td>`;
+    const detail=tr.querySelector("details"); if(detail&&openDetails.has(tr.dataset.agent))detail.open=true;
     tb.appendChild(tr);
+    if(focusState&&focusState.agent===tr.dataset.agent&&focusState.selector){
+      const target=[...tr.querySelectorAll(focusState.selector)].find(el=>!focusState.act||el.dataset.act===focusState.act);
+      if(target)target.focus({preventScroll:true});
+    }
   });
+  applyFilter(root);
 }
+// Roster filter: offered once a roster is larger than one screen of stations (or while in use).
+const FILTER_FROM=9;
+function applyFilter(root){
+  const tools=q(root,".roster-tools"), input=q(root,".roster-filter"); if(!tools||!input) return;
+  const rows=[...root.querySelectorAll(".agent-rows > tr[data-agent]")];
+  const term=input.value.trim().toLowerCase();
+  tools.hidden=rows.length<FILTER_FROM&&!term;
+  let shown=0;
+  rows.forEach(tr=>{const hit=!term||(tr.dataset.search||"").includes(term); tr.hidden=!hit; if(hit)shown++;});
+  q(root,".roster-count").textContent=term?`${shown} of ${rows.length} shown`:`${rows.length} agents`;
+}
+document.addEventListener("input",e=>{ if(e.target.matches(".roster-filter")) applyFilter(e.target.closest("section")); });
 // Collapsible blocks. The first OPEN_BY_DEFAULT blocks (agents table + the first service cards)
 // start expanded, the rest fold to their header line; a click on any header toggles it and the
 // choice is remembered per block in localStorage (a long list of modules stays scannable).
@@ -321,12 +466,14 @@ const OPEN_BY_DEFAULT=3;
 const collapseKey=n=>"agentsmon.collapsed:"+n;
 function setCollapsed(root,collapsed,persist){
   const b=q(root,".svc-body"),c=q(root,".svc-chev"); if(!b) return;
-  b.hidden=collapsed; if(c) c.textContent=collapsed?"▸":"▾"; root.dataset.collapsed=collapsed?"1":"0";
+  b.hidden=collapsed; const head=q(root,".svc-head"); if(head) head.setAttribute("aria-expanded",String(!collapsed)); if(c) c.textContent=collapsed?"▸":"▾"; root.dataset.collapsed=collapsed?"1":"0";
   if(persist){ try{ localStorage.setItem(collapseKey(root.dataset.cname||""),collapsed?"1":"0"); }catch(e){} }
 }
 function initCollapse(root,name,index){
   if(root.dataset.cname===name) return;
-  root.dataset.cname=name; let v=null; try{ v=localStorage.getItem(collapseKey(name)); }catch(e){}
+  root.dataset.cname=name;
+  const head=q(root,".svc-head"); if(head){head.tabIndex=0;head.setAttribute("role","button");head.setAttribute("aria-label", "Toggle "+name);}
+  let v=null; try{ v=localStorage.getItem(collapseKey(name)); }catch(e){}
   setCollapsed(root, v==null ? index>=OPEN_BY_DEFAULT : v==="1", false);
 }
 document.addEventListener("click",e=>{
@@ -334,24 +481,40 @@ document.addEventListener("click",e=>{
   const root=h.closest("section"); if(!root) return;
   setCollapsed(root, root.dataset.collapsed!=="1", true);
 });
+document.addEventListener("keydown",e=>{
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-copy]:not(button)")){e.preventDefault();e.target.click();}
+  if((e.key==="Enter"||e.key===" ")&&e.target.matches(".svc-head")){e.preventDefault();e.target.click();}
+});
 async function refresh(){
+  if(refreshBusy)return; refreshBusy=true;
   try{
-    const d=await (await fetch("/api/state",{credentials:"same-origin"})).json();
-    document.getElementById('app').style.maxWidth=(850+(d.columns||[]).length*100)+'px';
+    const response=await fetch("/api/state",{credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(requestTimeoutMs)});
+    if(!response.ok)throw new Error("HTTP "+response.status);
+    const d=await response.json();
+    if(!Array.isArray(d.agents)||!Array.isArray(d.services))throw new Error("Invalid snapshot");
+    document.getElementById("metric-agents").textContent=d.agents.length;
+    document.getElementById("metric-running").textContent=d.agents.filter(a=>a.kind!=="daemon"&&a.alive&&!a.needs_login).length;
+    const attention=d.agents.filter(a=>!a.alive||a.needs_login||a.metadata_error).length;
+    document.getElementById("metric-attention").textContent=attention;
+    document.getElementById("metric-attention-box").dataset.alert=attention?"true":"false";
+    renderGauge(d.agents);
     const agentsRoot=document.querySelector('section[data-svc="agents"]');
     renderAgents(agentsRoot, d.agents, null, d.columns||[]); initCollapse(agentsRoot,"agents",0);
     const tables=document.getElementById("plugin-tables");
-    const wanted=(d.agent_tables||[]).map(t=>t.id).join("|");
-    if(tables.dataset.keys!==wanted){
-      tables.innerHTML="";
-      (d.agent_tables||[]).forEach(t=>{
-        const root=document.getElementById("agent-table-tpl").content.firstElementChild.cloneNode(true);
-        root.dataset.svc=t.id; tables.appendChild(root);
-      });
-      tables.dataset.keys=wanted;
-    }
+    // Keyed by table id: a provider table added or removed elsewhere must not rebuild the others
+    // (their filter text, open details and keyboard focus live in those nodes).
+    const wantedIds=new Set((d.agent_tables||[]).map(t=>t.id));
+    [...tables.children].forEach(n=>{ if(!wantedIds.has(n.dataset.svc)) n.remove(); });   // drop first, so kept nodes need not move
+    const existing=new Map([...tables.children].map(n=>[n.dataset.svc,n]));
+    const ordered=(d.agent_tables||[]).map((t,i)=>{
+      let root=existing.get(t.id);
+      if(!root){root=document.getElementById("agent-table-tpl").content.firstElementChild.cloneNode(true);root.dataset.svc=t.id;}
+      existing.delete(t.id);
+      if(tables.children[i]!==root) tables.insertBefore(root, tables.children[i]||null);
+      return root;
+    });
     (d.agent_tables||[]).forEach((t,i)=>{
-      const root=tables.children[i]; q(root,"h2").textContent=t.title;
+      const root=ordered[i]; q(root,"h2").textContent=t.title;
       renderAgents(root,t.rows,t,d.columns||[]); initCollapse(root,t.id,i+1);
     });
     document.getElementById("plugin-loading").hidden=!d.plugin_loading;
@@ -367,14 +530,18 @@ async function refresh(){
     const sections=box.querySelectorAll("section");
     d.services.forEach((s,i)=>{ const root=sections[i]; q(root,".svc-name").textContent=s.name; renderService(root,s); initCollapse(root,s.name,i+1+(d.agent_tables||[]).length); });
     document.getElementById("footer").textContent="updated "+new Date().toLocaleTimeString()+` · core v${d.core.version} (${d.core.state})`;
-  }catch(e){document.getElementById("footer").textContent="connection lost…";}
+    lastSnapshot=Date.now(); connectionFailed=false; sweepDeck(); updateConnection();
+  }catch(e){document.getElementById("footer").textContent="connection lost…"; connectionFailed=true; updateConnection();
+  }finally{refreshBusy=false; updateConnection();}
 }
 function copyText(text){
   if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(text); }
   // Fallback for plain http (e.g. over a VPN IP): clipboard API needs a secure context.
+  const previousFocus=document.activeElement;
   const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
   document.body.appendChild(ta); ta.focus(); ta.select();
   try{ document.execCommand("copy"); }catch(e){} document.body.removeChild(ta);
+  if(previousFocus&&previousFocus.isConnected)previousFocus.focus({preventScroll:true});
   return Promise.resolve();
 }
 let _toastTimer;
@@ -408,10 +575,75 @@ document.addEventListener("click", async e=>{
   }catch(err){ showToast("⚠ "+err); }
   setTimeout(refresh, act==="restart"?2500:600);
 });
-refresh(); setInterval(refresh, POLL*1000);
+// ---- Security & ecosystem (read-only host snapshot, cached server-side) --------------------
+let ecoData=null, ecoTab="security", ecoBusy=false;
+const ECO_STATUS={ok:["bg-emerald-500","OK"],warn:["bg-amber-500","Warning"],risk:["bg-rose-500","Risk"],unknown:["bg-slate-300","Not verified"]};
+function ago(ts){if(!ts)return "–";const s=Math.max(0,Math.floor(Date.now()/1000-ts));return s<60?`${s}s ago`:fmtDuration(s)+" ago";}
+async function loadEco(refresh=false){
+  if(ecoBusy)return; ecoBusy=true;
+  const root=document.getElementById("eco"), btn=q(root,".eco-rescan");
+  btn.disabled=true;
+  try{
+    const r=await fetch("/api/ecosystem"+(refresh?"?refresh=1":""),{credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(requestTimeoutMs)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json(); if(!d||!d.security)throw new Error("Invalid snapshot");
+    ecoData=d; renderEco();
+  }catch(e){
+    const sum=q(root,".eco-summary"); sum.textContent="scan unavailable"; sum.className="eco-summary ml-auto text-sm font-medium text-amber-600";
+    if(!ecoData) q(root,".eco-panel").innerHTML=`<p class="eco-empty">Scan unavailable: ${esc(e.message||e)}</p>`;
+  }finally{ecoBusy=false; btn.disabled=false;}
+}
+function renderEco(){
+  const root=document.getElementById("eco"), d=ecoData; if(!d) return;
+  const c=d.security.counts, sum=q(root,".eco-summary");
+  const parts=[c.risk?`${c.risk} risk${c.risk>1?"s":""}`:"",c.warn?`${c.warn} warning${c.warn>1?"s":""}`:"",c.unknown?`${c.unknown} not verified`:""].filter(Boolean);
+  sum.textContent=parts.join(" · ")||"all checks passed";
+  sum.className="eco-summary ml-auto text-sm font-medium "+(c.risk?"text-rose-600":c.warn?"text-amber-600":"text-emerald-600");
+  q(root,".svc-dot").className="svc-dot h-3 w-3 rounded-full shrink-0 "+(c.risk?"bg-rose-500":c.warn?"bg-amber-500":"bg-emerald-500");
+  q(root,".eco-meta").textContent=`${d.host} · scanned ${ago(d.generated_at)}`;
+  root.querySelectorAll("[data-eco-tab]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.ecoTab===ecoTab)));
+  const panel=q(root,".eco-panel");
+  if(ecoTab==="security"){
+    const order={risk:0,warn:1,unknown:2,ok:3};
+    panel.innerHTML=`<div class="eco-list">`+[...d.security.checks].sort((a,b)=>order[a.status]-order[b.status]).map(x=>{const st=ECO_STATUS[x.status]||ECO_STATUS.unknown;
+      return `<div class="eco-row" data-status="${esc(x.status)}"><span class="h-2 w-2 rounded-full ${st[0]} shrink-0 eco-dot" title="${esc(st[1])}"></span>`+
+        `<div class="eco-main"><strong>${esc(x.title)}</strong><span class="eco-detail">${esc(x.detail)}</span>${x.advice?`<span class="eco-advice">${esc(x.advice)}</span>`:""}</div>`+
+        `<span class="eco-badge">${esc(st[1])}</span></div>`;}).join("")+`</div>`;
+  }else if(ecoTab==="access"){
+    panel.innerHTML=`<div class="eco-list">`+d.access.map(a=>{
+      const keys=(a.keys||[]); const shown=keys.slice(0,6).map(k=>`<code>${esc(k)}</code>`).join(" ")+(keys.length>6?` <span class="eco-detail">+${keys.length-6} more</span>`:"");
+      return `<div class="eco-row" data-status="${a.exposed?"risk":"ok"}"><span class="h-2 w-2 rounded-full ${a.exposed?"bg-rose-500":"bg-emerald-500"} shrink-0 eco-dot" title="${a.exposed?"Readable by other users":"Owner-only permissions"}"></span>`+
+        `<div class="eco-main"><strong>${esc(a.owner)} · ${esc(a.name)}</strong><span class="eco-detail">${esc(a.kind)}${a.note?" · "+esc(a.note):""}</span>`+
+        `<span class="eco-path">${esc(a.path)}</span>${keys.length?`<span class="eco-keys">${shown}</span>`:""}</div>`+
+        `<span class="eco-badge" title="file mode and age">${esc(a.mode||"")} · ${a.age_days!=null?esc(a.age_days)+" d":"–"}</span></div>`;}).join("")+`</div>`+
+      `<p class="eco-note">Names and file metadata only. Secret values are excluded from this response.</p>`;
+  }else{
+    const e=d.ecosystem, group=(title,rows)=>`<div class="eco-group"><h3>${esc(title)} <span>${rows.length}</span></h3>${rows.length?`<div class="eco-list">${rows.join("")}</div>`:`<p class="eco-empty">None found.</p>`}</div>`;
+    const row=(main,detail,badge,status="ok")=>`<div class="eco-row" data-status="${status}"><div class="eco-main"><strong>${main}</strong>${detail?`<span class="eco-detail">${detail}</span>`:""}</div>${badge?`<span class="eco-badge">${badge}</span>`:""}</div>`;
+    panel.innerHTML=
+      group("Agent sessions (tmux)",e.sessions.map(s=>row(esc(s.name),`${esc(s.command)} · ${esc(s.cwd)}`,"tmux")))+
+      group("Background services",e.services.map(u=>row(esc(u.name),esc(u.description),u.timer&&u.active!=="failed"?"on timer":esc(u.active),u.active==="failed"?"risk":u.active==="active"||u.timer?"ok":"warn")))+
+      group("Scheduled jobs (cron)",e.cron.map(c=>row(`<code>${esc(c)}</code>`,"","cron")))+
+      group("Listening ports",e.listeners.map(l=>row(`${esc(l.proto)} ${esc(l.address)}:${esc(l.port)}`,esc(l.process||"process hidden (other user)"),l.public?"public":"local",l.public&&!(l.port==="22"||l.process==="cloudflared")?"warn":"ok")))+
+      group("Repositories",e.repositories.map(r=>row(esc(r.path),`${esc(r.branch)}${r.remote?" · "+esc(r.remote):" · no remote"} · last commit ${ago(r.last_commit)}`,r.changes?`${esc(r.changes)} changed`:"clean",r.changes?"warn":"ok")));
+  }
+  q(root,".eco-limits").innerHTML=(d.limits||[]).map(l=>`<li>${esc(l)}</li>`).join("");
+}
+document.addEventListener("click",e=>{
+  const tab=e.target.closest("[data-eco-tab]"); if(tab){ecoTab=tab.dataset.ecoTab; renderEco(); return;}
+  if(e.target.closest(".eco-rescan")) loadEco(true);
+});
+document.addEventListener("keydown",e=>{
+  const tab=e.target.closest&&e.target.closest("[data-eco-tab]"); if(!tab||!["ArrowLeft","ArrowRight"].includes(e.key)) return;
+  const tabs=[...document.querySelectorAll("[data-eco-tab]")], i=tabs.indexOf(tab), next=tabs[(i+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length];
+  next.focus(); next.click();
+});
+initCollapse(document.getElementById("eco"),"ecosystem",99);
+loadEco(); setInterval(()=>loadEco(), 300000);
+refresh(); setInterval(()=>{nextPoll=Date.now()+POLL*1000; refresh();}, POLL*1000);
 </script></body></html>"""
 
-PAGE=PAGE.replace('AGENT_TABLES',
+PAGE=PAGE.replace('MISSION_CSS', _MISSION_CSS).replace('AGENT_TABLES',
     AGENT_TABLE.replace('KEY','agents').replace('HIDDEN','').replace('TITLE','Persistent Agents')
         .replace('NOTE','tmux sessions running an agent, linked by their <code>--resume</code> session id')+
     '<div id="plugin-tables"></div>'+
@@ -718,7 +950,8 @@ def make_server(host: str, port: int, cfg: dict):
     """Same handler for production and isolated HTTP acceptance tests."""
     require_auth_or_die(host, cfg)
     poll = cfg.get("dashboard", {}).get("poll_seconds", 15)
-    page = PAGE.replace("POLL", str(poll)).encode()
+    request_timeout = max(5, int(cfg.get("dashboard", {}).get("request_timeout_seconds", 120)))
+    page = PAGE.replace("POLL", str(poll)).replace("REQUEST_TIMEOUT", str(request_timeout)).encode()
     auth = cfg.get("dashboard", {}).get("auth") or {}
     auth_user, auth_hash = auth.get("user"), auth.get("pwhash")
 
@@ -739,6 +972,14 @@ def make_server(host: str, port: int, cfg: dict):
                 body = _state()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+            elif self.path.split("?")[0] == "/api/ecosystem":
+                # Read-only host snapshot (security checks, access inventory, ecosystem map).
+                # Same auth as /api/state; a refresh is rate-limited inside the module.
+                from . import ecosystem
+                body = json.dumps(ecosystem.snapshot(refresh="refresh=1" in self.path)).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
             elif self.path == "/" or self.path.startswith("/index"):
                 body = page
                 self.send_response(200)

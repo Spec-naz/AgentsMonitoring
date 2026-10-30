@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.4.0.dev4 (2026-10-30) — Security & ecosystem
+
+- New collapsible **Security & ecosystem** section (existing visual language, collapsed by default with the risk summary in its header) with three tabs:
+  - **Security:** read-only checks without root — effective sshd password/root login (first value wins across Includes), services listening on public addresses, ufw enabled, fail2ban, pending reboot, package/security updates and unattended-upgrades, credential file permissions, home directory mode. What needs root is reported as "not verified".
+  - **Access:** which agent/service holds which credential (Claude, Codex, Hermes, Telegram bridges, dashboard, Cloudflare tunnel, Base44, SSH login keys, unclassified token-like files in `~/.config`) with path, mode and age. Env files contribute key **names** only; secret values are never read into results or shown.
+  - **Ecosystem:** tmux agent sessions, user services, cron jobs (redacted), listening ports, git repositories and worktrees.
+- `GET /api/ecosystem` (same dashboard auth, `Cache-Control: no-store`); snapshot cached for 5 minutes, manual rescan rate-limited to 30 s.
+- Tests: `tests/test_ecosystem.py` (sshd parsing, secret safety, endpoint auth, cache) and fixture browser check `tests/verify_ecosystem_browser.py`.
+- Independent review: cron inventory now exposes only schedules and executable names; arguments and environment values are omitted. Git remote URLs omit userinfo, queries and fragments. Config parsing is described accurately; non-loopback listeners do not imply external reachability.
+- Failed listener probes and unreadable SSH includes remain unverified. SSH facts describe parsed global defaults, not per-user or runtime policy. Ecosystem browser acceptance is included in CI.
+
+## 0.4.0.dev3 (2026-10-29) — Compact Flight Deck preview
+
+- Claude unified the cockpit shapes and softened the panels, replaced widely spaced display typography with natural sans text and reduced station height.
+- The instrument cluster now shares one compact console. Larger rosters offer filtering by name, model or status; connection details remain expandable.
+- Preserve filter text and keyboard focus across polling and unrelated provider-table additions/removals. Correct empty filtered counts and contain extra provider columns within the roster.
+- Check header rectangles at 32 desktop/mobile widths to prevent concealed overlap. Add compact-roster browser acceptance to CI.
+- Independent density evidence with mixed long names: 10 complete stations at 1440x900, 8 at 1280x800, and 5 at 390x844, compared with 2/2/0 in dev2. This is a development preview; production is unchanged.
+
+## Unreleased — compact flight deck (Claude design iteration)
+
+- One console for identity, instruments, telemetry link and switches (≈104–157 px tall instead of ≈360 px); layout follows the app's own width via a container query, so instruments never overlap (rect-checked 1440–320 px).
+- Agents become compact station rows aligned like a table (56 px each): state-lit avatar ring, name, Telegram key, model pill, status, age, expandable connection details and action keys. Measured with fixture crews: 10 complete stations visible at 1440×900, 8 at 1280×800, 5 at 390×844.
+- One shape language (16/12/10 px radii, pill chips), natural sentence-case typography without wide letter-spacing; monospace only for numbers.
+- Roster filter appears for crews of 9+ (or while in use); filter text and focus survive refreshes and provider tables added/removed elsewhere (provider tables are now reused by id).
+- Wide provider columns scroll inside the roster frame instead of widening the page.
+- New fixture browser check `tests/verify_compact_browser.py`.
+
+## 0.4.0.dev2 (2026-10-29) — Flight Deck preview
+
+- Claude designed and implemented a spaceship cockpit: instrument bezels, crew availability gauge, station panels, clock, hardware-style controls and amber/cyan accents in dark/light themes.
+- Instruments show actual agent observations and the actual poll schedule; snapshot sweep and status changes respect reduced motion.
+- Independent review caught stale/light small-text contrast loss; text remains full contrast while decorative lights indicate stale data. The gauge label describes availability, including endpoint-backed daemons.
+- Add browser regression checks for full/partial/empty gauge values, endpoint-backed availability, live clock and next-poll timing. Preserve earlier functional fixes and provider compatibility.
+- This development preview is documented and reviewable; production deployment remains separate.
+
+## 0.4.0.dev1 (2026-10-29) — Mission Control preview
+
+- Flight deck visual design: cockpit canopy with local clock, instrument cluster (ring gauge of agents up, live count readouts, telemetry link with snapshot age and the real refresh countdown), advisory placard, and agent "stations" with state-lit rails, hardware-style keys and corner-bracket bezels. Every lit element is driven by a real snapshot or the real poll schedule; the only motion answers a received snapshot or a changed agent signal. Stale snapshots dash the deck borders and grey out status lights and gauge arcs while text keeps full contrast (≥4.5:1 measured in both themes). No external fonts or assets.
+- Replace clipped agent rows with responsive cards, wrapping full names and keeping Telegram links in their own reserved area.
+- Highlight actual agent status changes briefly; respect reduced-motion preferences.
+- Add a local dark/light theme preference, visible keyboard focus, accessible action names, keyboard section toggles and reduced-motion support.
+- Show native process counts separately from task activity or Telegram delivery; preserve provider-reported errors.
+- Display snapshot receipt age and persistent stale/connection-failed state, bound state fetches to a configurable timeout (120 seconds by default), reject non-success responses and prevent overlapping refreshes.
+- Preserve expanded connection details across refreshes. Keep provider columns, actions, health metrics and availability history.
+- Add fixture-based desktop/mobile and failure/recovery browser acceptance checks plus a documented rollback procedure. This is a development candidate, not a production deployment.
+
 ## 0.3.12 (2026-10-22)
 
 - The login hint for a Claude agent quotes the session name, so `tmux attach -t "T - Claude"` works when pasted. A test checks every attach hint.
