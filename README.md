@@ -382,6 +382,13 @@ stored as SHA-256 hashes. Restart commands and trusted plugins run as your user.
 MIT — see [LICENSE](LICENSE).
 
 
+### Security and ecosystem (0.4.0.dev4)
+
+The existing compact dashboard now includes a collapsed read-only host inventory:
+security observations, credential-file metadata, agent sessions, scheduled jobs,
+services, listeners and repositories. Unknown observations stay unverified;
+cron arguments and URL credentials are omitted. See [scope and limitations](docs/security-ecosystem.md).
+
 ### Compact Flight Deck preview (0.4.0.dev3)
 
 The dashboard is a compact spacecraft flight deck with unified rounded panels, natural typography, an availability gauge, live clock and actual refresh countdown. Agent stations use dense aligned rows, with expandable connection details and a filter for larger rosters. Full names and dedicated Telegram controls remain accessible.

@@ -45,6 +45,7 @@ jobs:
           python tests/verify_mission_browser.py --out browser-evidence/mission
           python tests/verify_plugins_browser.py --out browser-evidence/plugins
           python tests/verify_compact_browser.py --out browser-evidence/compact
+          python tests/verify_ecosystem_browser.py --out browser-evidence/ecosystem
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0.dev4 (2026-10-30) — Security & ecosystem
+
+- New collapsible **Security & ecosystem** section (existing visual language, collapsed by default with the risk summary in its header) with three tabs:
+  - **Security:** read-only checks without root — effective sshd password/root login (first value wins across Includes), services listening on public addresses, ufw enabled, fail2ban, pending reboot, package/security updates and unattended-upgrades, credential file permissions, home directory mode. What needs root is reported as "not verified".
+  - **Access:** which agent/service holds which credential (Claude, Codex, Hermes, Telegram bridges, dashboard, Cloudflare tunnel, Base44, SSH login keys, unclassified token-like files in `~/.config`) with path, mode and age. Env files contribute key **names** only; secret values are never read into results or shown.
+  - **Ecosystem:** tmux agent sessions, user services, cron jobs (redacted), listening ports, git repositories and worktrees.
+- `GET /api/ecosystem` (same dashboard auth, `Cache-Control: no-store`); snapshot cached for 5 minutes, manual rescan rate-limited to 30 s.
+- Tests: `tests/test_ecosystem.py` (sshd parsing, secret safety, endpoint auth, cache) and fixture browser check `tests/verify_ecosystem_browser.py`.
+- Independent review: cron inventory now exposes only schedules and executable names; arguments and environment values are omitted. Git remote URLs omit userinfo, queries and fragments. Config parsing is described accurately; non-loopback listeners do not imply external reachability.
+- Failed listener probes and unreadable SSH includes remain unverified. SSH facts describe parsed global defaults, not per-user or runtime policy. Ecosystem browser acceptance is included in CI.
+
 ## 0.4.0.dev3 (2026-10-29) — Compact Flight Deck preview
 
 - Claude unified the cockpit shapes and softened the panels, replaced widely spaced display typography with natural sans text and reduced station height.

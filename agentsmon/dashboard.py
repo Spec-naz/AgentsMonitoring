@@ -124,6 +124,27 @@ PAGE = r"""<!DOCTYPE html><html lang="en"><head>
   </header>
   <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
 AGENT_TABLES
+  <section id="eco" class="eco mb-6" aria-label="Security and ecosystem">
+    <div class="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 bg-white border-slate-200">
+      <span class="svc-dot h-3 w-3 rounded-full bg-slate-300 shrink-0"></span>
+      <h2 class="text-base font-semibold">Security &amp; ecosystem</h2>
+      <span class="eco-summary ml-auto text-sm font-medium text-slate-400">not scanned yet</span>
+      <span class="svc-chev text-slate-400 text-xs ml-2 select-none" title="collapse / expand">▾</span>
+    </div>
+    <div class="svc-body">
+      <div class="eco-toolbar">
+        <div class="eco-tabs" role="tablist" aria-label="Security and ecosystem views">
+          <button type="button" role="tab" data-eco-tab="security" aria-selected="true">Security</button>
+          <button type="button" role="tab" data-eco-tab="access" aria-selected="false">Access</button>
+          <button type="button" role="tab" data-eco-tab="ecosystem" aria-selected="false">Ecosystem</button>
+        </div>
+        <span class="eco-meta"></span>
+        <button type="button" class="eco-rescan">Rescan</button>
+      </div>
+      <div class="eco-panel" role="tabpanel" aria-live="polite"><p class="eco-empty">Waiting for the first scan…</p></div>
+      <ul class="eco-limits"></ul>
+    </div>
+  </section>
   <div id="services"></div>
   <p class="text-center text-[11px] text-slate-300" id="footer">auto-refresh</p>
 </div>
@@ -554,6 +575,71 @@ document.addEventListener("click", async e=>{
   }catch(err){ showToast("⚠ "+err); }
   setTimeout(refresh, act==="restart"?2500:600);
 });
+// ---- Security & ecosystem (read-only host snapshot, cached server-side) --------------------
+let ecoData=null, ecoTab="security", ecoBusy=false;
+const ECO_STATUS={ok:["bg-emerald-500","OK"],warn:["bg-amber-500","Warning"],risk:["bg-rose-500","Risk"],unknown:["bg-slate-300","Not verified"]};
+function ago(ts){if(!ts)return "–";const s=Math.max(0,Math.floor(Date.now()/1000-ts));return s<60?`${s}s ago`:fmtDuration(s)+" ago";}
+async function loadEco(refresh=false){
+  if(ecoBusy)return; ecoBusy=true;
+  const root=document.getElementById("eco"), btn=q(root,".eco-rescan");
+  btn.disabled=true;
+  try{
+    const r=await fetch("/api/ecosystem"+(refresh?"?refresh=1":""),{credentials:"same-origin",cache:"no-store",signal:AbortSignal.timeout(requestTimeoutMs)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json(); if(!d||!d.security)throw new Error("Invalid snapshot");
+    ecoData=d; renderEco();
+  }catch(e){
+    const sum=q(root,".eco-summary"); sum.textContent="scan unavailable"; sum.className="eco-summary ml-auto text-sm font-medium text-amber-600";
+    if(!ecoData) q(root,".eco-panel").innerHTML=`<p class="eco-empty">Scan unavailable: ${esc(e.message||e)}</p>`;
+  }finally{ecoBusy=false; btn.disabled=false;}
+}
+function renderEco(){
+  const root=document.getElementById("eco"), d=ecoData; if(!d) return;
+  const c=d.security.counts, sum=q(root,".eco-summary");
+  const parts=[c.risk?`${c.risk} risk${c.risk>1?"s":""}`:"",c.warn?`${c.warn} warning${c.warn>1?"s":""}`:"",c.unknown?`${c.unknown} not verified`:""].filter(Boolean);
+  sum.textContent=parts.join(" · ")||"all checks passed";
+  sum.className="eco-summary ml-auto text-sm font-medium "+(c.risk?"text-rose-600":c.warn?"text-amber-600":"text-emerald-600");
+  q(root,".svc-dot").className="svc-dot h-3 w-3 rounded-full shrink-0 "+(c.risk?"bg-rose-500":c.warn?"bg-amber-500":"bg-emerald-500");
+  q(root,".eco-meta").textContent=`${d.host} · scanned ${ago(d.generated_at)}`;
+  root.querySelectorAll("[data-eco-tab]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.ecoTab===ecoTab)));
+  const panel=q(root,".eco-panel");
+  if(ecoTab==="security"){
+    const order={risk:0,warn:1,unknown:2,ok:3};
+    panel.innerHTML=`<div class="eco-list">`+[...d.security.checks].sort((a,b)=>order[a.status]-order[b.status]).map(x=>{const st=ECO_STATUS[x.status]||ECO_STATUS.unknown;
+      return `<div class="eco-row" data-status="${esc(x.status)}"><span class="h-2 w-2 rounded-full ${st[0]} shrink-0 eco-dot" title="${esc(st[1])}"></span>`+
+        `<div class="eco-main"><strong>${esc(x.title)}</strong><span class="eco-detail">${esc(x.detail)}</span>${x.advice?`<span class="eco-advice">${esc(x.advice)}</span>`:""}</div>`+
+        `<span class="eco-badge">${esc(st[1])}</span></div>`;}).join("")+`</div>`;
+  }else if(ecoTab==="access"){
+    panel.innerHTML=`<div class="eco-list">`+d.access.map(a=>{
+      const keys=(a.keys||[]); const shown=keys.slice(0,6).map(k=>`<code>${esc(k)}</code>`).join(" ")+(keys.length>6?` <span class="eco-detail">+${keys.length-6} more</span>`:"");
+      return `<div class="eco-row" data-status="${a.exposed?"risk":"ok"}"><span class="h-2 w-2 rounded-full ${a.exposed?"bg-rose-500":"bg-emerald-500"} shrink-0 eco-dot" title="${a.exposed?"Readable by other users":"Owner-only permissions"}"></span>`+
+        `<div class="eco-main"><strong>${esc(a.owner)} · ${esc(a.name)}</strong><span class="eco-detail">${esc(a.kind)}${a.note?" · "+esc(a.note):""}</span>`+
+        `<span class="eco-path">${esc(a.path)}</span>${keys.length?`<span class="eco-keys">${shown}</span>`:""}</div>`+
+        `<span class="eco-badge" title="file mode and age">${esc(a.mode||"")} · ${a.age_days!=null?esc(a.age_days)+" d":"–"}</span></div>`;}).join("")+`</div>`+
+      `<p class="eco-note">Names and file metadata only. Secret values are excluded from this response.</p>`;
+  }else{
+    const e=d.ecosystem, group=(title,rows)=>`<div class="eco-group"><h3>${esc(title)} <span>${rows.length}</span></h3>${rows.length?`<div class="eco-list">${rows.join("")}</div>`:`<p class="eco-empty">None found.</p>`}</div>`;
+    const row=(main,detail,badge,status="ok")=>`<div class="eco-row" data-status="${status}"><div class="eco-main"><strong>${main}</strong>${detail?`<span class="eco-detail">${detail}</span>`:""}</div>${badge?`<span class="eco-badge">${badge}</span>`:""}</div>`;
+    panel.innerHTML=
+      group("Agent sessions (tmux)",e.sessions.map(s=>row(esc(s.name),`${esc(s.command)} · ${esc(s.cwd)}`,"tmux")))+
+      group("Background services",e.services.map(u=>row(esc(u.name),esc(u.description),u.timer&&u.active!=="failed"?"on timer":esc(u.active),u.active==="failed"?"risk":u.active==="active"||u.timer?"ok":"warn")))+
+      group("Scheduled jobs (cron)",e.cron.map(c=>row(`<code>${esc(c)}</code>`,"","cron")))+
+      group("Listening ports",e.listeners.map(l=>row(`${esc(l.proto)} ${esc(l.address)}:${esc(l.port)}`,esc(l.process||"process hidden (other user)"),l.public?"public":"local",l.public&&!(l.port==="22"||l.process==="cloudflared")?"warn":"ok")))+
+      group("Repositories",e.repositories.map(r=>row(esc(r.path),`${esc(r.branch)}${r.remote?" · "+esc(r.remote):" · no remote"} · last commit ${ago(r.last_commit)}`,r.changes?`${esc(r.changes)} changed`:"clean",r.changes?"warn":"ok")));
+  }
+  q(root,".eco-limits").innerHTML=(d.limits||[]).map(l=>`<li>${esc(l)}</li>`).join("");
+}
+document.addEventListener("click",e=>{
+  const tab=e.target.closest("[data-eco-tab]"); if(tab){ecoTab=tab.dataset.ecoTab; renderEco(); return;}
+  if(e.target.closest(".eco-rescan")) loadEco(true);
+});
+document.addEventListener("keydown",e=>{
+  const tab=e.target.closest&&e.target.closest("[data-eco-tab]"); if(!tab||!["ArrowLeft","ArrowRight"].includes(e.key)) return;
+  const tabs=[...document.querySelectorAll("[data-eco-tab]")], i=tabs.indexOf(tab), next=tabs[(i+(e.key==="ArrowRight"?1:tabs.length-1))%tabs.length];
+  next.focus(); next.click();
+});
+initCollapse(document.getElementById("eco"),"ecosystem",99);
+loadEco(); setInterval(()=>loadEco(), 300000);
 refresh(); setInterval(()=>{nextPoll=Date.now()+POLL*1000; refresh();}, POLL*1000);
 </script></body></html>"""
 
@@ -886,6 +972,14 @@ def make_server(host: str, port: int, cfg: dict):
                 body = _state()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+            elif self.path.split("?")[0] == "/api/ecosystem":
+                # Read-only host snapshot (security checks, access inventory, ecosystem map).
+                # Same auth as /api/state; a refresh is rate-limited inside the module.
+                from . import ecosystem
+                body = json.dumps(ecosystem.snapshot(refresh="refresh=1" in self.path)).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
             elif self.path == "/" or self.path.startswith("/index"):
                 body = page
                 self.send_response(200)
