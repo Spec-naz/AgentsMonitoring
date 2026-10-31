@@ -152,7 +152,7 @@ tr[data-state=down] .agent-avatar{box-shadow:inset 0 0 0 2px var(--bad);color:va
 .session-detail .sid{white-space:normal;overflow-wrap:anywhere;margin-top:6px;overflow:visible;font:12px var(--mono)}
 /* Keys for restart / stop / plugin actions. */
 .agent-rows td[data-label="Controls"]{display:flex!important;justify-content:flex-end;align-items:center;gap:6px;flex-wrap:wrap}
-.agent-rows button:not(.agent-name){display:inline-grid!important;place-items:center;width:32px;height:32px;border-radius:var(--r-key);border:1px solid var(--line-hi);background:var(--inset);padding:0;color:var(--muted);margin:0!important}
+.agent-rows button:not(.agent-name):not(.hint-i){display:inline-grid!important;place-items:center;width:32px;height:32px;border-radius:var(--r-key);border:1px solid var(--line-hi);background:var(--inset);padding:0;color:var(--muted);margin:0!important}
 .agent-rows .agent-act[data-act=stop]:hover{border-color:var(--bad)!important;color:var(--bad)!important;background:color-mix(in srgb,var(--bad) 10%,var(--inset))!important}
 .agent-rows .agent-act:not([data-act=stop]):hover{border-color:var(--accent)!important;color:var(--accent)!important}
 .provider-lock{display:inline-grid;place-items:center;width:32px;height:32px;border:1px dashed var(--line-hi);border-radius:var(--r-key);margin:0!important}
@@ -274,3 +274,40 @@ button:hover,a:hover{border-color:var(--accent)}:focus-visible{outline:2px solid
 .eco-empty,.eco-note{font:12.5px var(--sans);color:var(--muted);margin:6px 2px}
 .eco-limits{margin:10px 2px 0;padding-left:16px;list-style:disc;font:12px/1.5 var(--sans);color:var(--faint)}
 @media(max-width:640px){.eco-meta{margin-left:0;flex-basis:100%}.eco-row{padding:9px 11px;flex-wrap:wrap}.eco-badge{order:3;flex-basis:100%;padding-left:20px}}
+
+/* Quick links under the header */
+.links{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 16px}
+.links[hidden]{display:none}
+.links-label{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.links-list{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.link-chip{display:inline-flex;align-items:baseline;gap:8px;max-width:100%;padding:7px 12px;border-radius:var(--r-key);border:1px solid var(--line-hi);background:var(--panel-raised);color:var(--ink);text-decoration:none;font:500 13px var(--sans);min-width:0}
+.link-chip:hover{border-color:var(--accent);background:var(--row-hover)}
+.link-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.link-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-host{font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.link-arrow{color:var(--accent)}
+@media (max-width:520px){.link-host{display:none}}
+
+/* Czech hints: one popover, a small separate "i" button per explained label */
+.hint-target{cursor:help}
+.hint-i{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:16px;height:16px;margin-left:5px;padding:0;border-radius:50%;border:1px solid var(--line-hi);background:transparent;color:var(--muted);font:italic 600 10px/1 Georgia,serif;text-transform:none;letter-spacing:0;vertical-align:middle;cursor:help}
+.hint-i:hover,.hint-i[aria-expanded=true]{color:var(--accent);border-color:var(--accent)}
+.hint-i:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Mouse + keyboard: the label itself shows the hint on hover; the button stays invisible until focused. */
+@media (hover:hover) and (pointer:fine){
+  .hint-i{width:0;height:16px;margin-left:0;border-width:0;opacity:0;overflow:hidden}
+  .hint-i:focus-visible,.hint-i[aria-expanded=true]:focus{width:16px;margin-left:5px;border-width:1px;opacity:1}
+}
+/* Touch: a larger tap area without changing the row height. */
+@media (hover:none),(pointer:coarse){
+  .hint-i{position:relative}
+  .hint-i::after{content:"";position:absolute;inset:-8px}
+}
+.hint-pop{position:fixed;z-index:60;max-width:min(320px,calc(100vw - 16px));padding:10px 12px;border-radius:var(--r-key);border:1px solid var(--line-hi);background:var(--panel-raised);color:var(--ink);font:400 13px/1.45 var(--sans);text-transform:none;letter-spacing:0;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.hint-pop[hidden]{display:none}
+.hint-pop p{margin:0}
+.hint-detail{margin-top:6px!important;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+@media (prefers-reduced-motion:no-preference){.hint-pop{animation:hint-in .12s ease-out}@keyframes hint-in{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}}
+
+/* Keep the new info controls out of existing action-button sizing. */
+.session-detail:not([open]){display:inline-block;vertical-align:middle}

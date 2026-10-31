@@ -399,3 +399,9 @@ does not mean the agents stopped. The receipt time describes the browser snapsho
 the timestamp of every provider measurement.
 
 See [preview validation and rollback](docs/mission-control-preview.md).
+
+### Quick links and Czech explanations
+
+Operators can configure up to24 HTTPS links with `links: [{"title":"Team wiki","url":"https://wiki.example.com","note":"Optional description"}]` in the private config. Links appear below the header and open in a new tab. The destination must enforce its own access policy.
+
+Fixed Czech explanations are available on hover, keyboard focus or the separate info button on touch screens. Escape or outside tap closes the explanation. They make no AI/API call; existing copy, link and agent-action behavior remains available. Missing observations are explained without claiming an agent is offline.
