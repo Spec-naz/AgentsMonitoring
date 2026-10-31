@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Test
-        run: python -m unittest discover -s tests -v
+        run: python scripts/test.py -v
       - name: Lint
         run: |
           python -m pip install --quiet pyflakes

@@ -22,6 +22,7 @@
   characters, quotes, spaces and angle brackets are rejected, text is length-bounded and escaped in the
   browser; links open with `rel="noopener noreferrer"`. Unit tests: `tests/test_dashboard_links.py`.
 - Independent browser review keeps info controls out of action-button sizing and header metrics on one label line.
+- Safe test runner explicitly isolates HOME, state and config even when production paths are inherited.
 - Maintainer release includes version metadata, integrity manifest and independent desktop/mobile/keyboard validation.
 
 ## 0.4.0.dev4 (2026-10-30) — Security & ecosystem

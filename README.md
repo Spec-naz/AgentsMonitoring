@@ -405,3 +405,7 @@ See [preview validation and rollback](docs/mission-control-preview.md).
 Operators can configure up to24 HTTPS links with `links: [{"title":"Team wiki","url":"https://wiki.example.com","note":"Optional description"}]` in the private config. Links appear below the header and open in a new tab. The destination must enforce its own access policy.
 
 Fixed Czech explanations are available on hover, keyboard focus or the separate info button on touch screens. Escape or outside tap closes the explanation. They make no AI/API call; existing copy, link and agent-action behavior remains available. Missing observations are explained without claiming an agent is offline.
+
+### Run tests safely
+
+Use `python scripts/test.py` for core unit tests. It overrides HOME, AGENTSMON_STATE and AGENTSMON_CONFIG with private temporary paths, even when invoked from a production agent shell. Changing HOME alone is insufficient if the caller already exports production state/config paths. Browser fixture scripts never need production configuration.
