@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentops-reference"
+version = "0.1.1"
+description = "Explicit agent handoffs, truthful observations and isolated continuity rehearsal"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+agentops = "agentops.__main__:main"
+
+[tool.setuptools]
+packages = ["agentops"]

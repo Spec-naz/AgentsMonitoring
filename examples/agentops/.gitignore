@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.sqlite*
+*.zip
+*.tar*
+*.age
+.venv/
+*.egg-info/
+build/
+dist/

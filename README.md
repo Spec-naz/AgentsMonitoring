@@ -389,6 +389,15 @@ security observations, credential-file metadata, agent sessions, scheduled jobs,
 services, listeners and repositories. Unknown observations stay unverified;
 cron arguments and URL credentials are omitted. See [scope and limitations](docs/security-ecosystem.md).
 
+### AgentOps reference integration (0.1.1)
+
+The optional [standalone reference](examples/agentops/README.md) adds explicit task
+acceptance, review, audit events, truthful progress hints and isolated data restore
+rehearsal through Plugin API v1. It is separate from the dependency-free monitor
+runtime and introduces no core/UI changes or automatic task execution.
+The [continuity concept](examples/agentops/docs/continuity-of-system.md) explains
+Linux-first migration, single active consumers, identities and unproven recovery goals.
+
 ### Compact Flight Deck preview (0.4.0.dev3)
 
 The dashboard is a compact spacecraft flight deck with unified rounded panels, natural typography, an availability gauge, live clock and actual refresh countdown. Agent stations use dense aligned rows, with expandable connection details and a filter for larger rosters. Full names and dedicated Telegram controls remain accessible.
