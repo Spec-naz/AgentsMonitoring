@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 from . import __version__
-from .ledger import Ledger
+from .ledger import Ledger, actor
 from .observe import atomic_json, snapshot
 
 
@@ -58,8 +58,34 @@ def main():
     restore.add_argument('--archive', type=Path, required=True)
     restore.add_argument('--staging', type=Path, required=True)
     restore.add_argument('--sha256', help='Separately recorded expected archive hash')
+    encrypted = commands.add_parser('backup-age', help='Data-only age encryption; inventory is the default')
+    encrypted.add_argument('--root', action='append', default=[])
+    encrypted.add_argument('--output', type=Path, required=True)
+    encrypted.add_argument('--recipient', required=True, help='Public native age recipient, never a secret identity')
+    encrypted.add_argument('--age-executable', type=Path)
+    encrypted.add_argument('--execute', action='store_true')
+    decrypt = commands.add_parser('rehearse-age', help='Decrypt into private isolated staging; starts no services')
+    decrypt.add_argument('--archive', type=Path, required=True)
+    decrypt.add_argument('--staging', type=Path, required=True)
+    decrypt.add_argument('--identity-file', type=Path, required=True, help='Path to owned private recovery identity; contents are never arguments')
+    decrypt.add_argument('--age-executable', type=Path)
+    decrypt.add_argument('--sha256', help='Separately recorded expected ciphertext hash')
+    capability = commands.add_parser('age-capabilities')
+    capability.add_argument('--age-executable', type=Path)
+    hook_plan = commands.add_parser('provider-plan', help='Metadata-only hook merge plan; never writes provider config')
+    hook_plan.add_argument('--provider', choices=('claude', 'codex'), required=True)
+    hook_plan.add_argument('--actor', required=True)
+    hook_plan.add_argument('--settings', type=Path)
+    hook_plan.add_argument('--state-dir', type=Path)
+    hook_plan.add_argument('--include-activity', action='store_true')
+    bind = commands.add_parser('provider-bind', help='Declare an exact actor/provider/session binding')
+    bind.add_argument('--actor', required=True)
+    bind.add_argument('--provider', choices=('claude', 'codex'), required=True)
+    bind.add_argument('--session-id', required=True)
+    bind.add_argument('--state-dir', type=Path)
+    bind.add_argument('--max-age-seconds', type=int, default=900)
     args = parser.parse_args()
-    if args.command == 'backup':
+    if args.command in ('backup', 'backup-age'):
         from .continuity import export_backup
         roots = {}
         for entry in args.root:
@@ -67,10 +93,42 @@ def main():
             if not separator or not value or name in roots:
                 raise ValueError('Use unique --root label=/absolute/path')
             roots[name] = Path(value)
-        result = export_backup(roots, args.output, ledger_path=args.db if args.db.exists() else None, dry_run=not args.execute)
+        if args.command == 'backup-age':
+            from .encrypted import export_encrypted
+            result = export_encrypted(roots, args.output, args.recipient,
+                                      ledger_path=args.db if args.db.exists() else None,
+                                      age_executable=args.age_executable, dry_run=not args.execute)
+        else:
+            result = export_backup(roots, args.output, ledger_path=args.db if args.db.exists() else None, dry_run=not args.execute)
     elif args.command == 'rehearse':
         from .continuity import restore_backup
         result = restore_backup(args.archive, args.staging, expected_sha256=args.sha256)
+    elif args.command == 'rehearse-age':
+        from .encrypted import rehearse_encrypted
+        result = rehearse_encrypted(args.archive, args.staging, args.identity_file,
+                                    age_executable=args.age_executable, expected_sha256=args.sha256)
+    elif args.command == 'age-capabilities':
+        from .encrypted import capabilities
+        result = capabilities(args.age_executable)
+    elif args.command == 'provider-plan':
+        from .provider_signals import hook_command, plan_install
+        who = actor(args.actor)
+        command = '/usr/bin/env AGENTOPS_ACTOR=' + who + ' ' + hook_command(
+            args.provider, python=sys.executable, package_root=Path(__file__).resolve().parents[1], state_dir=args.state_dir)
+        _, result = plan_install(args.provider, args.settings, command, args.include_activity)
+    elif args.command == 'provider-bind':
+        from .provider_signals import SESSION_RE
+        who = actor(args.actor)
+        if not SESSION_RE.fullmatch(args.session_id) or not 60 <= args.max_age_seconds <= 86400:
+            raise ValueError('Exact valid session and bounded freshness required')
+        config = json.loads(args.config.read_text()) if args.config.exists() else {'schema_version': 1}
+        config.setdefault('provider_bindings', {})[who] = {
+            'provider': args.provider, 'session_id': args.session_id,
+            'state_dir': str(args.state_dir or Path.home() / '.local/state/agentops/provider-signals'),
+            'max_age_seconds': args.max_age_seconds}
+        atomic_json(args.config, config)
+        result = {'bound_actor': who, 'provider': args.provider, 'exact_session': True,
+                  'identity_authenticated': False, 'hooks_installed': False}
     else:
         ledger = Ledger(args.db)
         try:

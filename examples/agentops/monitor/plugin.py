@@ -18,7 +18,9 @@ def collect(context, settings):
     states = {'queued': 'Awaiting start', 'running': 'In progress (declared)', 'blocked': 'Blocked',
               'handoff_pending': 'Awaiting acceptance', 'review': 'In review', 'done': 'Reviewed', 'cancelled': 'Cancelled'}
     alerts = {'waiting_input_hint': 'Possible input dialog', 'progress_overdue_hint': 'Progress update overdue',
-              'handoff_unacknowledged': 'Handoff not accepted', 'declared_blocked': 'Blocked by owner'}
+              'handoff_unacknowledged': 'Handoff not accepted', 'declared_blocked': 'Blocked by owner',
+              'provider_waiting_input': 'Input requested (hook)', 'provider_waiting_hint': 'Approval may be pending',
+              'provider_turn_failed': 'Turn failed (hook)'}
     tasks = sorted(data['tasks'], key=lambda t: (t['state'] in ('done', 'cancelled'), -t['updated']))[:100]
     rows = []
     for task in tasks:
@@ -46,16 +48,35 @@ def collect(context, settings):
     signals = []
     for name, observation in data.get('signals', {}).items():
         signal = observation.get('signal')
+        provider = observation.get('provider_observation', {})
+        label = 'Terminal heuristic'
+        detail = 'Configured terminal observation only; not proof of a hang. No keystrokes are sent.'
+        healthy = False
         if signal == 'waiting_input_hint' and observation.get('samples', 0) >= 2:
             status = 'Possible input dialog'
+        elif provider.get('state') in ('turn_running', 'waiting_input', 'idle', 'failed', 'ended', 'unknown'):
+            statuses = {'turn_running': 'Turn started (hook)', 'idle': 'Turn ended (hook)',
+                        'waiting_input': 'Input requested (hook)', 'failed': 'Turn failed (hook)',
+                        'ended': 'Session ended (hook)', 'unknown': 'No fresh bound hook'}
+            status = statuses[provider['state']]
+            if provider['state'] == 'idle' and provider.get('last_event') != 'Stop':
+                status = 'Idle reported (hook)'
+            if provider['state'] == 'waiting_input' and provider.get('confidence') != 'confirmed':
+                status = 'Approval may be pending'
+            label = str(provider.get('provider') or 'Provider') + ' hook'
+            healthy = provider['state'] in ('turn_running', 'idle')
+            detail = 'Last bound provider event: ' + str(provider.get('last_event') or 'none') + '. '
+            if provider.get('age_seconds') is not None:
+                detail += str(int(provider['age_seconds'])) + 's ago. '
+            detail += 'Provider turn state, not task progress or process-health proof. No task is completed automatically.'
         elif signal == 'unavailable':
             status = 'Observation unavailable'
         else:
             continue
-        signals.append({'id': name, 'name': name, 'label': 'Terminal heuristic', 'alive': False,
+        signals.append({'id': name, 'name': name, 'label': label, 'alive': healthy,
                         'status': status, 'actions_locked': True,
-                        'status_detail': 'Configured terminal observation only; not proof of a hang. No keystrokes are sent.'})
+                        'status_detail': detail[:500]})
     if signals:
-        tables.append({'id': 'signals', 'title': 'Agent signals (heuristic)', 'rows': signals,
-                       'note': 'Independent of task registration. Repeated modal hints require human verification; no automatic intervention.'})
+        tables.append({'id': 'signals', 'title': 'Agent signals (hooks / hints)', 'rows': signals,
+                       'note': 'Independent of task registration. Hook events describe turns, hints need verification; neither proves task progress. No automatic intervention.'})
     return {'tables': tables}
