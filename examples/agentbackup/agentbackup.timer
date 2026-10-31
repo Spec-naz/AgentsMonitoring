@@ -1,0 +1,11 @@
+[Unit]
+Description=Hourly encrypted recovery capsule
+
+[Timer]
+OnCalendar=*-*-* *:10:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=agentbackup.service
+
+[Install]
+WantedBy=timers.target

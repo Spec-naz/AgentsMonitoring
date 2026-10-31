@@ -1,0 +1,41 @@
+# AgentBackup 0.1.1
+
+Hourly age-encrypted application recovery capsules and optional rclone OneDrive
+copy with SHA256 full-download verification. Runtime: Python stdlib, verified age
+and rclone; optional pg_dump/pg_restore for the wiki database. No sudo.
+
+`backup.py --config /private/settings.json --local-only` creates a local capsule.
+Without --local-only, remote authorization is required; failure is nonzero and
+recorded separately from local success. No sync, remote pruning or credential
+export. Full source modules are preserved; .env, links, caches, dependency/build
+directories and live DB files are omitted. SQLite uses online backup; Postgres
+uses consistent pg_dump custom format. All output/temporary files owner-only.
+Capsule ZIP is encrypted before publication. Normal plaintext cleanup is not
+secure erase and cannot guarantee cleanup after power loss/SIGKILL.
+
+Restore uses the previously reviewed AgentOps continuity validator copied to
+`continuity_restore.py` with its original safety rules unchanged. No scripts from
+restored code are executed by the restore tool. `restore.py --help` and RECOVERY.md
+explain recovery. The private recovery identity never belongs on the production VPS.
+
+No unattended offsite success until server OAuth authorization AND an actual
+upload/download hash check pass. Chat connector tokens are not extracted/reused.
+The OneDrive remote is rooted to the dedicated existing folder, but OAuth scopes
+may permit access elsewhere in the user's OneDrive: root scoping is not an OAuth
+security boundary. Request only Files.ReadWrite offline_access; no SharePoint search.
+
+Snapshots of different applications do not form a global transaction. Sources
+changing during file copy fail the run. Missing required roots/databases fail
+rather than silently produce an apparently complete backup. Ciphertext SHA256
+needs a trusted independently recorded source; same-storage hashes are not signatures.
+
+Limits: max512MiB uncompressed capsule, max128MiB per file, max10000files;
+5GiB minimum free disk, 4GiB ciphertext backlog guard. No remote deletion.
+Local last48 retention only deletes archives with a recorded verified offsite copy.
+An unuploaded backlog is preserved and eventually stops growing at the guard.
+User service uses low CPU/IO priority, 768MiB memory ceiling, 25% CPU quota and
+a bounded execution timeout. A failed transfer remains visibly failed; no fake success.
+
+Tests: WAL SQLite snapshot and complete source recovery, credential/symlink exclusion,
+tampered archive rejection before extraction; actual local capsule sandbox rehearsal
+recorded privately. No test is claimed for unattended OneDrive until authorization.
