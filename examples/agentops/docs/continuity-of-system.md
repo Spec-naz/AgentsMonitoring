@@ -55,8 +55,10 @@ SQLite zálohovat online backup API, ne náhodnou kopií hlavního souboru bez W
 
 Produkční obnovovací balík má být šifrovaný zavedeným nástrojem (například age),
 s obnovovacím klíčem uloženým mimo zálohovaný server. Implementace MVP žádnou
-vlastní kryptografii nevytváří a požadavek přibalit tajemství odmítne. Off-host
-úložiště a šifrovaný přenos ještě nejsou nakonfigurované; lokální ZIP není DR záloha.
+vlastní kryptografii nevytváří a požadavek přibalit tajemství odmítne. Od AgentOps
+0.2 umí datový export šifrovat zavedeným age a ověřit izolované dešifrování;
+otestované jsou dočasné identity, nikoli produkční obnovovací klíč uživatele.
+Off-host úložiště a přenos ještě nejsou nakonfigurované; lokální archiv není DR záloha.
 
 OAuth či zařízení-vázaná přihlášení nemusí být přenositelná. Přenos tokenu není
 garance platného přihlášení. Při podezření na kompromitaci tokeny rotovat a obnovit

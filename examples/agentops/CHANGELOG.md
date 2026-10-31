@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0 — 2026-10-31
+
+- Observe allowlisted Claude Code and native Codex lifecycle hook metadata with
+  private per-session storage, exact actor/session bindings and freshness checks.
+  Source labels distinguish provider turn state from terminal hints and task progress.
+- Provide metadata-only hook plans preserving existing handlers; no full settings
+  output or blanket trust changes. Hook processes use isolated Python to avoid cwd shadowing.
+- Add explicit-recipient age encryption and isolated authenticated decryption of
+  data-only exports. Offsite transport and secret-bearing identity bundles remain separate.
+- Real age fixtures and one isolated native Codex start/stop callback smoke passed.
+
 ## 0.1.1 — 2026-10-31
 
 - Expose repeated terminal modal hints and unavailable observations independently

@@ -57,6 +57,26 @@ def observe_sessions(sessions, previous=None):
 def snapshot(ledger, config, now=None, signals=None, previous=None):
     now = time.time() if now is None else now
     signals = observe_sessions(config.get('sessions', {}), previous) if signals is None else signals
+    bindings = config.get('provider_bindings', {})
+    if not isinstance(bindings, dict) or len(bindings) > 32:
+        raise ValueError('Invalid provider bindings')
+    if bindings:
+        from .provider_signals import agent_signal, SESSION_RE
+        for name, binding in bindings.items():
+            if not re.fullmatch(r'[a-z][a-z0-9_-]{0,47}', name) or not isinstance(binding, dict):
+                raise ValueError('Invalid provider binding')
+            provider, session = binding.get('provider'), binding.get('session_id')
+            max_age = binding.get('max_age_seconds', 900)
+            if provider not in ('claude', 'codex') or not isinstance(session, str) or not SESSION_RE.fullmatch(session) or type(max_age) is not int or not 60 <= max_age <= 86400:
+                raise ValueError('Provider binding requires exact session and bounded freshness')
+            evidence = agent_signal(name, provider,
+                                    state_dir=Path(binding.get('state_dir', Path.home() / '.local/state/agentops/provider-signals')).expanduser(),
+                                    now=now, session_id=session,
+                                    limits={'running_max_age': max_age, 'waiting_max_age': max_age, 'idle_max_age': max_age})
+            observation = signals.setdefault(name, {'signal': 'unclassified', 'samples': 0, 'observed_at': now,
+                                                   'source': 'provider-binding'})
+            observation['provider_observation'] = {key: evidence.get(key) for key in
+                ('state', 'reason', 'source', 'provider', 'last_event', 'last_event_at', 'age_seconds', 'confidence', 'proves_task_progress')}
     stale = config.get('stale_after_seconds', 900)
     handoff_after = config.get('handoff_after_seconds', 600)
     if type(stale) is not int or not 60 <= stale <= 86400 or type(handoff_after) is not int or not 60 <= handoff_after <= 86400:
@@ -67,8 +87,13 @@ def snapshot(ledger, config, now=None, signals=None, previous=None):
         progress_age = max(0, now - task['progress']) if task['progress'] is not None else None
         observation = signals.get(task['owner'], {})
         hint = observation.get('signal') if observation.get('samples', 0) >= 2 else None
+        provider = observation.get('provider_observation', {})
         attention = None
-        if state in ('running', 'review') and hint == 'waiting_input_hint':
+        if state in ('running', 'review') and provider.get('state') == 'waiting_input':
+            attention = 'provider_waiting_input' if provider.get('confidence') == 'confirmed' else 'provider_waiting_hint'
+        elif state in ('running', 'review') and provider.get('state') == 'failed':
+            attention = 'provider_turn_failed'
+        elif state in ('running', 'review') and hint == 'waiting_input_hint':
             attention = 'waiting_input_hint'
         elif state == 'handoff_pending' and now - task['updated'] > handoff_after:
             attention = 'handoff_unacknowledged'
@@ -85,4 +110,5 @@ def snapshot(ledger, config, now=None, signals=None, previous=None):
             'access': {'principal_model': 'shared Unix account', 'actor_names_authenticated': False,
                        'declarations': config.get('access_declarations', [])},
             'limitations': ['No task execution or automatic retries.', 'Modal and overdue signals are hints, not proof of a hang.',
-                            'A task state is declared, not observed execution.', 'Permissions listed here are not enforcement.']}
+                            'A task state is declared, not observed execution.', 'Provider turn events never complete tasks or refresh progress.',
+                            'Permissions listed here are not enforcement.']}

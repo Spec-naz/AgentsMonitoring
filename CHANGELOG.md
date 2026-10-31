@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — optional AgentOps reference 0.1.1
+## Unreleased — optional AgentOps reference 0.2.0
 
 - Add a standalone standard-library task/handoff ledger and snapshot-only plugin
   under `examples/agentops`, without changing or adding dependencies to the monitor core.

@@ -20,7 +20,10 @@ async def verify(source, out):
     with tempfile.TemporaryDirectory() as temporary:
         path = Path(temporary) / 'snapshot.json'
         path.write_text(json.dumps({'schema_version': 1, 'generated_at': time.time(), 'costs': [],
-            'signals': {'klodak': {'signal': 'waiting_input_hint', 'samples': 2}}, 'tasks': [
+            'signals': {'klodak': {'signal': 'waiting_input_hint', 'samples': 2},
+                        'kodak': {'signal': 'unclassified', 'provider_observation': {
+                            'state': 'idle', 'provider': 'codex', 'last_event': 'Stop', 'age_seconds': 3,
+                            'confidence': 'confirmed', 'proves_task_progress': False}}}, 'tasks': [
             {'id': 'uuid-one', 'title': 'Review <img src=x onerror="window.PWNED=1">', 'owner': 'kodak',
              'state': 'handoff_pending', 'target': 'klodak', 'version': 3, 'created': time.time() - 700,
              'updated': time.time(), 'progress_age_seconds': 650, 'attention': 'handoff_unacknowledged'}]}))
@@ -55,6 +58,7 @@ async def verify(source, out):
                     await page.goto('http://fixture.test/')
                     await page.get_by_text('Handoff not accepted', exact=True).wait_for()
                     await page.get_by_text('Possible input dialog', exact=True).wait_for()
+                    await page.get_by_text('Turn ended (hook)', exact=True).wait_for()
                     assert await page.locator('img').count() == 0
                     assert await page.evaluate('window.PWNED || null') is None
                     assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')

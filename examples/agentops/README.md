@@ -1,4 +1,4 @@
-# AgentOps reference — 0.1.1
+# AgentOps reference — 0.2.0
 
 A small, dependency-free operational layer alongside AgentsMonitoring. It records
 explicit tasks and handoff acceptance, independent review, append-only events,
@@ -39,8 +39,11 @@ fake progress heartbeats. An overdue update is a hint, not proof of a hang. The
 fallback modal detector captures only explicitly configured tmux panes in memory,
 stores pattern IDs only, requires two observations before flagging input-waiting,
 and never sends keystrokes. Unknown/idle-looking terminal content stays unclassified.
-Provider hooks are a planned stronger source; no hooks or auth configuration are
-automatically changed by this reference implementation.
+Provider hooks are a stronger, separately labelled source of turn events. Exact
+session binding and freshness checks prevent another session or stale state from
+being treated as the current actor. Hooks never refresh declared task progress or
+complete tasks. The default plan does not edit provider configuration; see
+[provider signals](docs/provider-signals.md) for reviewed installation/trust steps.
 
 Runtime state defaults to `~/.local/state/agentops/` and declarations to
 `~/.config/agentops/config.json`. Both remain outside Git. Avoid secrets, transcript
@@ -71,8 +74,10 @@ python3 -m agentops rehearse --archive /private/backups/agentops.zip --staging /
 The source roots must be explicitly reviewed. Filename filtering cannot prove an
 arbitrary source file contains no secrets. In particular, task history, code or
 artifacts can contain sensitive data; treat every archive as private. Secret opt-in
-fails closed; encrypted identity bundles and off-host storage remain a separate
-operator workflow. The export returns an archive SHA256 for independent recording;
+fails closed. Optional [age-encrypted data export and rehearsal](docs/encrypted-continuity.md)
+use an independently verified age executable and an explicit public recipient;
+encrypted identity bundles and off-host storage remain a separate operator workflow.
+The export returns an archive SHA256 for independent recording;
 internal hashes alone do not authenticate an attacker-replaced archive. Missing
 paths and excluded items are disclosed rather than counted as recovered.
 
