@@ -16,6 +16,11 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from agentsmon import dashboard
 
 
+async def _status_detail(cell):
+    target = cell.locator("[data-hint]")
+    return (await target.get_attribute("data-hint-detail")) or (await cell.get_attribute("title")) or ""
+
+
 async def verify(args):
     from playwright.async_api import async_playwright
     args.out.mkdir(parents=True,exist_ok=True)
@@ -91,21 +96,21 @@ async def verify(args):
                 await page.wait_for_timeout(350)
                 daemon_status=upper.locator('tbody tr').nth(1).locator('td').nth(4)
                 await page.screenshot(path=str(args.out/'daemon-status.png'),full_page=True)
-                assert await daemon_status.inner_text()=='Process running',await daemon_status.inner_text()
-                assert 'latency 1 ms' in await daemon_status.get_attribute('title')
-                assert 'Health endpoint OK' in await daemon_status.get_attribute('title')
-                assert await upper.locator('tbody tr').first.locator('td').nth(4).inner_text()=='Process running'
+                assert await daemon_status.locator('[data-hint]').inner_text()=='Process running',await daemon_status.inner_text()
+                assert 'latency 1 ms' in await _status_detail(daemon_status)
+                assert 'Health endpoint OK' in await _status_detail(daemon_status)
+                assert await upper.locator('tbody tr').first.locator('td').nth(4).locator('[data-hint]').inner_text()=='Process running'
                 # A live login gate must be yellow; liveness still prevents keeper restarts.
                 shared.update(needs_login=True, status='Needs login')
                 await page.evaluate('refresh()')
                 login = upper.locator('tbody tr').first.locator('td').nth(4)
-                assert await login.inner_text() == 'Needs login'
+                assert await login.locator('[data-hint]').inner_text() == 'Needs login'
                 assert await login.locator('.bg-amber-500').count() == 1
                 assert await login.locator('.bg-emerald-500').count() == 0
                 await page.screenshot(path=str(args.out/'needs-login.png'), full_page=True)
                 shared.update(needs_login=False, alive=False, status='Stopped (manual)')
                 await page.evaluate('refresh()')
-                assert await login.inner_text() == 'Stopped (manual)'
+                assert await login.locator('[data-hint]').inner_text() == 'Stopped (manual)'
                 assert 'Example Agent' in await upper.inner_text()
                 shared.update(alive=True, status='Running')
                 await page.evaluate('refresh()')
@@ -113,8 +118,8 @@ async def verify(args):
                 for latency,expected in ((0,'latency <1 ms'),(None,None)):
                     daemon['latency_ms']=latency
                     await page.evaluate('refresh()')
-                    assert await daemon_status.inner_text()=='Process running'
-                    tooltip=await daemon_status.get_attribute('title')
+                    assert await daemon_status.locator('[data-hint]').inner_text()=='Process running'
+                    tooltip=await _status_detail(daemon_status)
                     if expected:
                         assert expected in tooltip,tooltip
                     else:
@@ -124,9 +129,9 @@ async def verify(args):
                 for status in (None,'Down','Timeout','Error'):
                     daemon['status']=status
                     await page.evaluate('refresh()')
-                    assert await daemon_status.inner_text()==(status or 'Process stopped')
+                    assert await daemon_status.locator('[data-hint]').inner_text()==(status or 'Process stopped')
                     assert await daemon_status.locator('.bg-emerald-500').count()==0
-                    assert 'Health endpoint failed' in await daemon_status.get_attribute('title')
+                    assert 'Health endpoint failed' in await _status_detail(daemon_status)
                 await page.wait_for_timeout(350)
                 await page.screenshot(path=str(args.out/'daemon-error.png'),full_page=True)
                 # An explicit error from a provider retains precedence, even with alive=true.

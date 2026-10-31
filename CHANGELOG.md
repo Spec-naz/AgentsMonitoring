@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0.dev5 — 2026-10-31 · Quick links, Czech hints
+
+- **Czech hints** (Michal is not a developer): fixed Czech explanations embedded in the page for header
+  metrics, roster column headers, status texts (core and AgentOps hook/task states), the „–“ missing value,
+  „— none“, gateway port, Connection details, provider lock, „⚠ Fresh conversation“, Security & ecosystem,
+  „Not verified“/„public“ badges and Links. No network or AI call. Texts separate unknown from offline and
+  process/turn signals from task progress; causes are not presented as facts.
+- Mouse: hover over the label. Keyboard: a separate „i“ button (`aria-label="Nápověda"`) becomes visible
+  on focus. Touch: the small „i“ button is always visible and opens the hint on tap. Escape or a tap
+  outside closes it; one hint at a time; it follows the same row across polling re-renders.
+- The button is a separate element after the label (after `<details>` for Connection details), so copy on
+  click, Telegram links, actions, collapsing and link chips keep their behaviour. The English `title` of an
+  explained label moves into the hint as „Technický detail“ to avoid a second native tooltip.
+  Tests: `tests/test_czech_hints.py`.
+
+- Optional **Links** strip under the header, configured by the operator in `config.json` as
+  `"links": [{"title": "Brain", "url": "https://…", "note": "tooltip"}]` (max 24). Hidden when empty.
+- Delivered in `/api/state` (`links`), so config edits appear on the next poll without a dashboard restart.
+- Only absolute `https` URLs with a host and without credentials pass server-side validation; control
+  characters, quotes, spaces and angle brackets are rejected, text is length-bounded and escaped in the
+  browser; links open with `rel="noopener noreferrer"`. Unit tests: `tests/test_dashboard_links.py`.
+- Independent browser review keeps info controls out of action-button sizing and header metrics on one label line.
+- Safe test runner explicitly isolates HOME, state and config even when production paths are inherited.
+- Maintainer release includes version metadata, integrity manifest and independent desktop/mobile/keyboard validation.
+
 ## 0.4.0.dev4 (2026-10-30) — Security & ecosystem
 
 - New collapsible **Security & ecosystem** section (existing visual language, collapsed by default with the risk summary in its header) with three tabs:

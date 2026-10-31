@@ -39,6 +39,9 @@ DEFAULTS = {
     "plugin_entry_points": [],  # opt-in names in the agentsmon.plugins entry point group
     "usage_plugin": None,       # explicit row -> account/source mapping; no automatic credentials
     "hidden_sessions": [],
+    # Quick links shown under the header (e.g. a team wiki behind the same access gateway).
+    # Each: {"title": "Brain", "url": "https://...", "note": "optional tooltip"}. https only.
+    "links": [],
     "dashboard": {"host": "127.0.0.1", "port": 8765, "poll_seconds": 15},
     "probe": {"interval_seconds": 60, "sla_window_days": 90, "timeline_days": 90, "min_outage_samples": 3},
     "keepalive": {"enabled": True, "interval_seconds": 60},

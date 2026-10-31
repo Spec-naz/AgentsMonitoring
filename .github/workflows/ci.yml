@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Test
-        run: python -m unittest discover -s tests -v
+        run: python scripts/test.py -v
       - name: Lint
         run: |
           python -m pip install --quiet pyflakes
@@ -46,6 +46,7 @@ jobs:
           python tests/verify_plugins_browser.py --out browser-evidence/plugins
           python tests/verify_compact_browser.py --out browser-evidence/compact
           python tests/verify_ecosystem_browser.py --out browser-evidence/ecosystem
+          python tests/verify_czech_hints_browser.py --out browser-evidence/hints
       - uses: actions/upload-artifact@v4
         if: always()
         with:
