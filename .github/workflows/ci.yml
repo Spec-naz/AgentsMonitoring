@@ -9,6 +9,20 @@ permissions:
   contents: read
 
 jobs:
+  agentops-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify standalone operational reference
+        working-directory: examples/agentops
+        run: |
+          python -m unittest discover -s tests -v
+          python -m pip install --quiet pyflakes
+          python -m pyflakes agentops monitor tests
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -46,6 +60,7 @@ jobs:
           python tests/verify_plugins_browser.py --out browser-evidence/plugins
           python tests/verify_compact_browser.py --out browser-evidence/compact
           python tests/verify_ecosystem_browser.py --out browser-evidence/ecosystem
+          python examples/agentops/tests/verify_monitor_browser.py --agentsmon . --out browser-evidence/agentops
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "id": "agentops",
+  "version": "0.1.0",
+  "module": "plugin.py",
+  "timeout_seconds": 2,
+  "settings": {"snapshot_path": "~/.local/state/agentops/snapshot.json"}
+}

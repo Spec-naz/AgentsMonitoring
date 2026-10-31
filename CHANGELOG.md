@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — optional AgentOps reference 0.1.0
+
+- Add a standalone standard-library task/handoff ledger and snapshot-only plugin
+  under `examples/agentops`, without changing or adding dependencies to the monitor core.
+- Include declared progress/modal hints, independent review, idempotency, separate
+  observed/estimated costs, explicit-root backup and empty-staging SQLite restore rehearsal.
+- Document a jointly reviewed continuity concept with Linux-first migration, single
+  active execution, identity/encryption limits and unmeasured RPO/RTO goals.
+- Verify the reference separately in CI and check it against the existing browser renderer.
+
 ## 0.4.0.dev4 (2026-10-30) — Security & ecosystem
 
 - New collapsible **Security & ecosystem** section (existing visual language, collapsed by default with the risk summary in its header) with three tabs:
