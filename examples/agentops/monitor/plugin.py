@@ -42,4 +42,20 @@ def collect(context, settings):
     else:
         note += 'Costs unknown (no entries). '
     note += 'Unrecorded costs unknown; shared account permissions are not isolated.'
-    return {'tables': [{'id': 'tasks', 'title': 'Work queue (declared state)', 'rows': rows, 'note': note[:500]}]}
+    tables = [{'id': 'tasks', 'title': 'Work queue (declared state)', 'rows': rows, 'note': note[:500]}]
+    signals = []
+    for name, observation in data.get('signals', {}).items():
+        signal = observation.get('signal')
+        if signal == 'waiting_input_hint' and observation.get('samples', 0) >= 2:
+            status = 'Possible input dialog'
+        elif signal == 'unavailable':
+            status = 'Observation unavailable'
+        else:
+            continue
+        signals.append({'id': name, 'name': name, 'label': 'Terminal heuristic', 'alive': False,
+                        'status': status, 'actions_locked': True,
+                        'status_detail': 'Configured terminal observation only; not proof of a hang. No keystrokes are sent.'})
+    if signals:
+        tables.append({'id': 'signals', 'title': 'Agent signals (heuristic)', 'rows': signals,
+                       'note': 'Independent of task registration. Repeated modal hints require human verification; no automatic intervention.'})
+    return {'tables': tables}

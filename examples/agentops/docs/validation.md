@@ -1,4 +1,4 @@
-# 0.1.0 validation and limits
+# 0.1.1 validation and limits
 
 Independent review examined the ledger and observation/plugin implementation.
 It found a review-forwarding loophole: forwarding an unchanged artifact could
@@ -6,7 +6,7 @@ replace its producer and permit self-review. The fix preserves original provenan
 through review forwards and rejects a return to that producer. A regression covers
 the loop. Actor labels remain declarations, not authenticated identities.
 
-Thirty isolated tests pass, including transactions/replay/CAS, reviewed completion,
+Thirty-one isolated tests pass, including transactions/replay/CAS, reviewed completion,
 append-only history, separate actual/estimate/currency accounting, non-reassigning
 stale hints, terminal-content omission, stale snapshot expiry and eighteen backup
 acceptance cases (including SQLite WAL, corruption, path traversal, links/devices,
@@ -15,6 +15,8 @@ collisions, concurrent destination creation and protected empty staging).
 Pyflakes passes. Fixture browser acceptance normalizes the real plugin contract
 through AgentsMonitoring and checks the existing renderer, an unaccepted handoff,
 escaping, dark/light themes and 1280/390/320 px layouts. No core visual files changed.
+Repeated modal hints are exposed even when no task is registered for that agent;
+otherwise the original blocked-dialog incident could be missed outside the ledger.
 
 A real local data rehearsal exported selected code and the active task ledger,
 verified a separately recorded archive SHA256, restored into empty private staging

@@ -37,6 +37,19 @@ class ObserveTests(unittest.TestCase):
         self.assertEqual(result['tables'][0]['rows'], [])
         self.assertIn('error', result['tables'][0])
 
+    def test_repeated_modal_is_visible_even_without_a_registered_task(self):
+        spec = importlib.util.spec_from_file_location('plugin', Path(__file__).parents[1] / 'monitor/plugin.py')
+        plugin = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(plugin)
+        data = {'schema_version': 1, 'generated_at': time.time(), 'tasks': [], 'signals': {
+            'klodak': {'signal': 'waiting_input_hint', 'samples': 2}}}
+        with patch.object(plugin.Path, 'stat') as stat, patch.object(plugin.Path, 'read_text', return_value=json.dumps(data)):
+            stat.return_value.st_size = 200
+            tables = plugin.collect({}, {})['tables']
+        self.assertEqual(tables[1]['id'], 'signals')
+        self.assertEqual(tables[1]['rows'][0]['status'], 'Possible input dialog')
+        self.assertTrue(tables[1]['rows'][0]['actions_locked'])
+
 
 if __name__ == '__main__':
     unittest.main()

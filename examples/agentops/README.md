@@ -1,4 +1,4 @@
-# AgentOps reference — 0.1.0
+# AgentOps reference — 0.1.1
 
 A small, dependency-free operational layer alongside AgentsMonitoring. It records
 explicit tasks and handoff acceptance, independent review, append-only events,

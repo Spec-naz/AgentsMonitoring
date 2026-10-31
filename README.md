@@ -389,7 +389,7 @@ security observations, credential-file metadata, agent sessions, scheduled jobs,
 services, listeners and repositories. Unknown observations stay unverified;
 cron arguments and URL credentials are omitted. See [scope and limitations](docs/security-ecosystem.md).
 
-### AgentOps reference integration (0.1.0)
+### AgentOps reference integration (0.1.1)
 
 The optional [standalone reference](examples/agentops/README.md) adds explicit task
 acceptance, review, audit events, truthful progress hints and isolated data restore

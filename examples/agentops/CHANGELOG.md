@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-10-31
+
+- Expose repeated terminal modal hints and unavailable observations independently
+  of task registration, so an agent without an active ledger task is still visible.
+
 ## 0.1.0 — 2026-10-31
 
 - SQLite task ledger with explicit acceptance, independent review, append-only events,

@@ -19,17 +19,18 @@ async def verify(source, out):
     out.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as temporary:
         path = Path(temporary) / 'snapshot.json'
-        path.write_text(json.dumps({'schema_version': 1, 'generated_at': time.time(), 'costs': [], 'tasks': [
+        path.write_text(json.dumps({'schema_version': 1, 'generated_at': time.time(), 'costs': [],
+            'signals': {'klodak': {'signal': 'waiting_input_hint', 'samples': 2}}, 'tasks': [
             {'id': 'uuid-one', 'title': 'Review <img src=x onerror="window.PWNED=1">', 'owner': 'kodak',
              'state': 'handoff_pending', 'target': 'klodak', 'version': 3, 'created': time.time() - 700,
              'updated': time.time(), 'progress_age_seconds': 650, 'attention': 'handoff_unacknowledged'}]}))
         raw = module.collect({}, {'snapshot_path': str(path)})
         provider = plugins.Plugin('agentops', '0.1.0', {}, {}, 2)
         # Normalize through the same contract as a production worker.
-        rows = [plugins.row(row, provider.id) for row in raw['tables'][0]['rows']]
-        table = {**raw['tables'][0], 'id': 'agentops:tasks', 'rows': rows}
+        tables = [{**table, 'id': 'agentops:' + table['id'],
+                   'rows': [plugins.row(row, provider.id) for row in table['rows']]} for table in raw['tables']]
     state = {'time': time.time(), 'agents': [], 'services': [], 'columns': [], 'plugin_errors': [],
-             'agent_tables': [table], 'core': {'version': 'fixture', 'state': 'clean'}}
+             'agent_tables': tables, 'core': {'version': 'fixture', 'state': 'clean'}}
     async def route(request):
         url = request.request.url
         if '/api/state' in url:
@@ -53,6 +54,7 @@ async def verify(source, out):
                     await page.route('**/*', route)
                     await page.goto('http://fixture.test/')
                     await page.get_by_text('Handoff not accepted', exact=True).wait_for()
+                    await page.get_by_text('Possible input dialog', exact=True).wait_for()
                     assert await page.locator('img').count() == 0
                     assert await page.evaluate('window.PWNED || null') is None
                     assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
