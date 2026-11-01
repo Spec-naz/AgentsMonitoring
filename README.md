@@ -409,3 +409,9 @@ Fixed Czech explanations are available on hover, keyboard focus or the separate 
 ### Run tests safely
 
 Use `python scripts/test.py` for core unit tests. It overrides HOME, AGENTSMON_STATE and AGENTSMON_CONFIG with private temporary paths, even when invoked from a production agent shell. Changing HOME alone is insufficient if the caller already exports production state/config paths. Browser fixture scripts never need production configuration.
+
+### Antigravity quota readings
+
+[Configure one statusLine collector per provider profile](docs/antigravity-usage.md);
+new registered Antigravity conversations then receive Usage readings automatically
+by UUID, without per-agent source mappings. Financial pool labels stay explicit.
