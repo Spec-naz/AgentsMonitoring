@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "suite_id": "lc06-synthetic-v1",
+  "oracle_version": "agentops-regression-v1",
+  "cases": [
+    {
+      "case_id": "backup-folder",
+      "case_version": 1,
+      "origin_kind": "synthetic",
+      "origin_ref": "synthetic:LC06-B",
+      "instruction": "Verify both the synthetic destination and matching content.",
+      "check": "backup_destination",
+      "expected": {
+        "destination": "synthetic:backup-target"
+      }
+    },
+    {
+      "case_id": "restored-app",
+      "case_version": 1,
+      "origin_kind": "synthetic",
+      "origin_ref": "synthetic:LC06-R",
+      "instruction": "Verify readable restored data AND an independent application healthcheck.",
+      "check": "restored_application",
+      "expected": {}
+    },
+    {
+      "case_id": "timeout-unknown",
+      "case_version": 1,
+      "origin_kind": "synthetic",
+      "origin_ref": "synthetic:LC06-T",
+      "instruction": "After an uncertain timeout inspect target state and do not blindly repeat the action.",
+      "check": "timeout_reconciliation",
+      "expected": {
+        "operation_id": "synthetic-op-001"
+      }
+    }
+  ]
+}

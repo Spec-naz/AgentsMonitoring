@@ -84,7 +84,37 @@ def main():
     bind.add_argument('--session-id', required=True)
     bind.add_argument('--state-dir', type=Path)
     bind.add_argument('--max-age-seconds', type=int, default=900)
+    regress = commands.add_parser('regress', help='Offline synthetic case checks; never executes agents or deploys')
+    operations = regress.add_subparsers(dest='operation', required=True)
+    template = operations.add_parser('template', help='Create empty, suite-bound observations')
+    template.add_argument('--suite', type=Path, required=True)
+    template.add_argument('--output', type=Path, required=True)
+    evaluate = operations.add_parser('run', help='Evaluate explicit observations; returns 2 unless all cases pass')
+    evaluate.add_argument('--suite', type=Path, required=True)
+    evaluate.add_argument('--observations', type=Path, required=True)
+    evaluate.add_argument('--revision', required=True)
+    evaluate.add_argument('--output', type=Path, required=True)
+    comparison = operations.add_parser('compare', help='Compare same-contract reports; never authorizes deployment')
+    comparison.add_argument('--baseline', type=Path, required=True)
+    comparison.add_argument('--candidate', type=Path, required=True)
+    comparison.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    if args.command == 'regress':
+        from . import regression
+        if args.operation == 'template':
+            result = regression.observation_template(regression.read_document(args.suite))
+            blocked = False
+        elif args.operation == 'run':
+            result = regression.run(regression.read_document(args.suite), regression.read_document(args.observations), args.revision)
+            blocked = any(row['verdict'] != 'pass' for row in result['results'])
+        else:
+            result = regression.compare(regression.read_document(args.baseline), regression.read_document(args.candidate))
+            blocked = result['quality_gate'] == 'blocked'
+        regression.write_report(args.output, result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if blocked:
+            raise SystemExit(2)
+        return
     if args.command in ('backup', 'backup-age'):
         from .continuity import export_backup
         roots = {}
