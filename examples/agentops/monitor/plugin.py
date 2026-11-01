@@ -21,7 +21,8 @@ def collect(context, settings):
               'handoff_unacknowledged': 'Handoff not accepted', 'declared_blocked': 'Blocked by owner',
               'provider_waiting_input': 'Input requested (hook)', 'provider_waiting_hint': 'Approval may be pending',
               'provider_turn_failed': 'Turn failed (hook)'}
-    tasks = sorted(data['tasks'], key=lambda t: (t['state'] in ('done', 'cancelled'), -t['updated']))[:100]
+    active_tasks = [task for task in data['tasks'] if task['state'] not in ('done', 'cancelled')]
+    tasks = sorted(active_tasks, key=lambda task: -task['updated'])[:100]
     rows = []
     for task in tasks:
         state = task['state']
@@ -38,7 +39,7 @@ def collect(context, settings):
                      'status_detail': detail[:500], 'actions_locked': True,
                      'age': max(0, time.time() - task['created'])})
     costs = data.get('costs', [])
-    note = 'Declared workflow; actor labels are not authenticated. '
+    note = f'Showing {len(tasks)} of {len(active_tasks)} active tasks; history retained. Declared workflow; actors not authenticated. '
     if costs:
         note += 'Recorded costs: ' + '; '.join(f"{entry['micros']/1000000:.6f} {entry['currency']} ({entry['kind']})" for entry in costs[:6]) + '. '
     else:
@@ -52,12 +53,11 @@ def collect(context, settings):
         label = 'Terminal heuristic'
         detail = 'Configured terminal observation only; not proof of a hang. No keystrokes are sent.'
         healthy = False
-        if signal == 'waiting_input_hint' and observation.get('samples', 0) >= 2:
-            status = 'Possible input dialog'
-        elif provider.get('state') in ('turn_running', 'waiting_input', 'idle', 'failed', 'ended', 'unknown'):
+        repeated_hint = signal == 'waiting_input_hint' and observation.get('samples', 0) >= 2
+        state = provider.get('state')
+        if state in ('waiting_input', 'idle', 'failed') or (state == 'turn_running' and not repeated_hint):
             statuses = {'turn_running': 'Turn started (hook)', 'idle': 'Turn ended (hook)',
-                        'waiting_input': 'Input requested (hook)', 'failed': 'Turn failed (hook)',
-                        'ended': 'Session ended (hook)', 'unknown': 'No fresh bound hook'}
+                        'waiting_input': 'Input requested (hook)', 'failed': 'Turn failed (hook)'}
             status = statuses[provider['state']]
             if provider['state'] == 'idle' and provider.get('last_event') != 'Stop':
                 status = 'Idle reported (hook)'
@@ -69,14 +69,16 @@ def collect(context, settings):
             if provider.get('age_seconds') is not None:
                 detail += str(int(provider['age_seconds'])) + 's ago. '
             detail += 'Provider turn state, not task progress or process-health proof. No task is completed automatically.'
-        elif signal == 'unavailable':
-            status = 'Observation unavailable'
+        elif repeated_hint:
+            status = 'Possible input dialog'
         else:
             continue
         signals.append({'id': name, 'name': name, 'label': label, 'alive': healthy,
                         'status': status, 'actions_locked': True,
                         'status_detail': detail[:500]})
+    total_observed = len(data.get('signals', {}))
+    tables[0]['note'] = (f'Current signals: {len(signals)}/{total_observed} configured agents; missing data is not a failure or health proof. ' + tables[0]['note'])[:500]
     if signals:
         tables.append({'id': 'signals', 'title': 'Agent signals (hooks / hints)', 'rows': signals,
-                       'note': 'Independent of task registration. Hook events describe turns, hints need verification; neither proves task progress. No automatic intervention.'})
+                       'note': 'Fresh bound hook events and repeated terminal hints only. Missing or stale observations are omitted, not healthy. Turn state does not prove task progress. No automatic intervention.'})
     return {'tables': tables}

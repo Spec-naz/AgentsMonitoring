@@ -93,6 +93,12 @@ under the configured AgentsMonitoring modules directory. Produce snapshots with
 the manifest; no core or visual files are changed. Snapshots older than three
 minutes hide old rows and display an error. No actions are exposed in the browser.
 
+Work queue shows up to 100 active tasks, newest declared update first: queued,
+running, blocked, awaiting handoff acceptance and in review. Reviewed/completed
+(`done`) and cancelled tasks are omitted from this view. They remain in the
+ledger, task history and snapshots. These are declared workflow states, not
+measurements of whether an agent is currently executing work.
+
 ## Validation
 
 ```bash
