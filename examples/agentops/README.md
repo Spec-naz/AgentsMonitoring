@@ -115,3 +115,10 @@ Optional renderer acceptance: `tests/verify_monitor_browser.py --agentsmon PATH
 The optional [Task workers plugin](docs/worker-monitoring.md) shows explicitly
 registered workers independently of persistent sessions and the task snapshot.
 It makes no model/auth calls and never starts or restarts a worker.
+
+### Offline regression cases
+
+`agentops regress template/run/compare` evaluates explicit synthetic observations and
+compares per-case results using the same full suite/oracle contract. It never invokes
+agents or external actions and never authorizes deployment. See the runnable
+[LC-06 workflow](docs/regression-workflow.md) and `examples/regression/`.

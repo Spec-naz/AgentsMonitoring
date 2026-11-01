@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.4 — 2026-11-01
+
+- Add offline synthetic regression template/run/compare commands with full suite
+  contract hashes, per-case verdicts, missing-evidence gates and private no-overwrite
+  reports. Include backup destination, restored application and timeout reconciliation
+  fixtures; successful checks still require independent review.
+
 ## 0.2.3 — 2026-11-01
 
 - Fail closed on missing, empty or relative worker registration paths and empty provider
