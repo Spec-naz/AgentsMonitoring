@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 import zipfile
+from retention import prune_local, prune_remote
 
 EXCLUDED = {'.git', '.env', 'node_modules', 'dist', '__pycache__', '.venv', 'venv', '.cache', '.pytest_cache'}
 MAX_BYTES = 512 * 1024**2
@@ -174,15 +175,11 @@ def run(config, local_only=False):
                            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             status.update(verified)
             private_json(state/'last-offsite-success.json',status)
-        # Local retention only, after a verified offsite copy; remote files are never deleted.
+        # Retention runs only after a new verified offsite archive AND receipt upload.
         if status['offsite_ok']:
-            keep=sorted(state.glob('agent-recovery-*.zip.age'),reverse=True)
-            for old in keep[int(cfg.get('local_keep',48)):]:
-                receipt=old.with_suffix(old.suffix+'.json')
-                if receipt.is_file():
-                    record=json.loads(receipt.read_text())
-                    if record.get('offsite_ok'):
-                        old.unlink();receipt.unlink()
+            if cfg.get('remote_retention_days'):
+                status['remote_pruned']=prune_remote(common,cfg['remote'],cfg['remote_retention_days'],output.name)
+            status['local_pruned']=prune_local(state,cfg.get('local_keep',48),output.name)
         private_json(output.with_suffix(output.suffix+'.json'),status)
         private_json(state/'last-attempt.json',status)
         print(json.dumps(status))

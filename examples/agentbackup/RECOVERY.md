@@ -44,9 +44,10 @@ Před nasazením na jiný host ověřit konfiguraci, závislosti a cesty pro dan
 ## Plán, kapacita a návrat
 Každý den kolem04:00Europe/Prague nový šifrovaný archiv; další přenos jen po serverovém přihlášení
 rclone. Upload je kopie, nikdy sync. Po uploadu se archiv stáhne a ověří SHA256.
-Lokálně uchovat posledních48, ale staré lokální soubory mazat pouze s dokladem
-úspěšného offsite přenosu. Vzdálené soubory se automaticky nemažou. Nastavení
-vzdálené retenční politiky následuje po měření skutečného denního růstu.
+Lokálně uchovat posledních7ověřených kopií; staré lokální soubory smazat pouze
+s dokladem úspěšného offsite přenosu a ověřeným SHA256. Na OneDrive po úspěšné
+nové záloze mazat rozpoznané zálohy starší30dnů s platným dokladem přenosu.
+Vždy zachovat aktuální/nejnovější archiv, neověřené či neznámé soubory a recovery-kit.
 Soubor last-offsite-success.json je důkaz posledního úspěchu, last-attempt.json
 posledního pokusu; existence nového místního souboru neznamená nový OneDrive backup.
 Neúspěch přenosu se nezaměňuje za úspěch zálohy mimo server.

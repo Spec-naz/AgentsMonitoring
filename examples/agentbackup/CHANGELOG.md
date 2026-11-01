@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3 — 2026-11-01
+
+- Owner-approved retention:30days in the explicit OneDrive folder and7latest verified local copies.
+- Cleanup only follows successful new upload, destination listing, readback SHA256 and receipt publication.
+- Exact recognized capsule/receipt pairs only; preserve current/newest, unverified/unknown entries and recovery tools.
+- Local candidates recheck their SHA256 before deletion.
+
 ## 0.1.2 — 2026-11-01
 
 - Use explicit AgentOps-Backups folder path at the drive root instead of relying on root_folder_id. Refuse absolute paths and join file names without an unintended leading slash.
