@@ -3,6 +3,7 @@
 Read local usage/status-line snapshots only. No OAuth token reads or network
 requests; never infer that all agents from one vendor share an account.
 """
+import hashlib
 from datetime import datetime
 import json
 import math
@@ -20,7 +21,7 @@ def window(label, pct, reset, now):
     if type(pct) not in (int,float) or not math.isfinite(pct) or not 0<=pct<=100: return None
     reset=epoch(reset)
     if reset and reset<=now: return None
-    return {'label':label,'percent':round(pct,1),
+    return {'label':label,'percent':round(pct,1),**({'resets_at':reset} if reset else {}),
             'title':('Resets '+datetime.fromtimestamp(reset).astimezone().isoformat()) if reset else 'Reset time unavailable'}
 
 
@@ -60,8 +61,13 @@ def read_source(spec, now):
         if b: bars.append(b)
     if not bars: return {'text':'No current reading','tone':'muted','title':'No unexpired usage window'}
     stale=now-stamp>600 or stamp>now+30
-    return {'text':'Cached' if stale else '', 'tone':'muted' if stale else 'ok', 'bars':bars,
+    value={'text':'Cached' if stale else '', 'tone':'muted' if stale else 'ok', 'bars':bars,
             'title':f"{spec.get('account','Explicit source')} · {kind} · {datetime.fromtimestamp(stamp).astimezone().isoformat()}"}
+    # Only exact operator-declared source/pool identity can share a displayed reading.
+    if isinstance(spec.get('account'),str) and spec['account'].strip():
+        identity=[str(Path(spec['path']).expanduser().absolute()),kind,spec['account']]
+        value['quota_group']='source-'+hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+    return value
 
 
 def antigravity_reading(sid, directory, now):

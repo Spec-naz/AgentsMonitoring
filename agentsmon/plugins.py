@@ -47,16 +47,22 @@ def objects(value, limit=200):
 
 def cell(value):
     if isinstance(value,str): return {'text':text(value)}
-    if not isinstance(value,dict) or set(value)-{'text','title','tone','bars'}: raise ValueError('Invalid cell')
+    if not isinstance(value,dict) or set(value)-{'text','title','tone','bars','quota_group'}: raise ValueError('Invalid cell')
     result={'text':text(value.get('text','')),'title':text(value.get('title',''))}
     if value.get('tone') not in (None,'muted','ok','warning','error'): raise ValueError('Invalid tone')
     result['tone']=value.get('tone')
+    if 'quota_group' in value:
+        group=value['quota_group']
+        if not isinstance(group,str) or not re.fullmatch(r'source-[a-f0-9]{64}',group): raise ValueError('Invalid quota group')
+        result['quota_group']=group
     if 'bars' in value:
         result['bars']=[]
         for b in objects(value['bars'],4):
             pct=number(b['percent'])
             if pct>100: raise ValueError('Invalid percent')
-            result['bars'].append({'label':text(b['label'],30),'percent':pct,'title':text(b.get('title',''))})
+            bar={'label':text(b['label'],30),'percent':pct,'title':text(b.get('title',''))}
+            if b.get('resets_at') is not None: bar['resets_at']=number(b['resets_at'])
+            result['bars'].append(bar)
     return result
 
 

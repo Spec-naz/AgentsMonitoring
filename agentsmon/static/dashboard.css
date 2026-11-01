@@ -311,3 +311,26 @@ button:hover,a:hover{border-color:var(--accent)}:focus-visible{outline:2px solid
 
 /* Keep the new info controls out of existing action-button sizing. */
 .session-detail:not([open]){display:inline-block;vertical-align:middle}
+
+/* Plan limits: remaining quota per account (local snapshots only). Ring = what is LEFT. */
+.quota{margin:0 0 16px;display:flex;flex-direction:column;gap:8px}
+.quota[hidden]{display:none}
+.quota-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px}
+.quota-card{padding:12px 14px;border-radius:var(--r-console);background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);min-width:0}
+.quota-card header{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.q-name{font:600 14px var(--sans);color:var(--ink);overflow-wrap:anywhere}
+.q-account{font:500 12px var(--sans);color:var(--muted)}
+.q-stale{margin-left:auto;font:500 11px var(--sans);color:var(--faint);padding:2px 8px;border-radius:999px;border:1px solid var(--line-hi)}
+.q-rings{display:flex;gap:16px;flex-wrap:wrap}
+.q-ring{display:flex;align-items:center;gap:10px;min-width:0}
+.q-ring svg{flex:0 0 64px;width:64px;height:64px}
+.q-track{stroke:var(--inset);stroke-width:10;fill:none}
+.q-arc{stroke:var(--good);stroke-width:10;fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1),stroke .3s;filter:drop-shadow(var(--glow) var(--good))}
+.q-ring[data-level=mid] .q-arc{stroke:var(--warn);filter:drop-shadow(var(--glow) var(--warn))}
+.q-ring[data-level=low] .q-arc{stroke:var(--bad);filter:drop-shadow(var(--glow) var(--bad))}
+.q-ring text{font:600 22px var(--mono);fill:var(--ink);font-variant-numeric:tabular-nums}
+.q-meta{display:flex;flex-direction:column;gap:2px;min-width:0}
+.q-meta strong{font:600 13px var(--sans);color:var(--ink);text-transform:capitalize}
+.q-meta span{font:500 12px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
+.quota-card.is-stale .q-arc{opacity:.6}
+@media (prefers-reduced-motion:reduce){.q-arc{transition:none}}
