@@ -186,7 +186,7 @@ def install(profile_home, profile, pool, directory, apply=False):
     previous = json.loads(original) if original is not None else {}
     if not isinstance(previous, dict):
         raise ValueError('Invalid settings object')
-    arguments = [sys.executable, '-I', str(Path(__file__).absolute()), 'collect',
+    arguments = [sys.executable, '-I', str(Path(__file__).resolve()), 'collect',
                  '--profile', label(profile), '--pool', label(pool),
                  '--snapshot-dir', str(Path(directory).expanduser().absolute())]
     wrapper = path.parent / 'agentsmon-statusline.sh'

@@ -249,5 +249,20 @@ class AntigravityUsageTests(unittest.TestCase):
                                    '--profile', 'gcp', '--pool', 'GCP trial', '--snapshot-dir', str(self.directory)]), 0)
 
 
+    def test_install_through_current_symlink_pins_actual_reviewed_release(self):
+        release = self.root / 'immutable-release'
+        module = release / 'agentsmon/antigravity_usage.py'
+        module.parent.mkdir(parents=True)
+        module.write_text('synthetic module path only')
+        current = self.root / 'current'
+        current.symlink_to(release, target_is_directory=True)
+        with patch.object(collector, '__file__', str(current / 'agentsmon/antigravity_usage.py')):
+            result = collector.install(self.root / 'profile', 'consumer', 'AI Pro', self.directory, apply=True)
+        import shlex
+        words = shlex.split(Path(result['command_path']).read_text().splitlines()[2][5:])
+        self.assertEqual(words[2], str(module))
+        self.assertNotIn('/current/', words[2])
+
+
 if __name__ == '__main__':
     unittest.main()
