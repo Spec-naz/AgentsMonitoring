@@ -15,12 +15,12 @@ Microsoftu. Žádný token ani heslo neposílat do chatu. Pokud přístup zaká�
 přenášení se nedokončí a plán zůstává pouze lokální.
 
 Požadované scopes: Files.ReadWrite offline_access. Microsoft potvrzení může
-povolovat čtení/zápis souborů účtu, ne jen jediné zálohovací složky. Nastavení
-rclone root_folder_id omezuje chování programu, není omezením samotného tokenu.
+povolovat čtení/zápis souborů účtu, ne jen jediné zálohovací složky. Cílová cesta
+rclone určuje složku AgentOps-Backups; není omezením samotného tokenu.
 Nežádáme Sites.Read.All ani vyhledávání ostatních SharePoint webů.
 
 Skript po přihlášení udělá novou šifrovanou zálohu, nahraje ji a stáhne pro
-kontrolu SHA256. Teprve po úspěchu přepne hodinový timer z lokálního režimu
+kontrolu SHA256. Teprve po úspěchu přepne denní timer z lokálního režimu
 na OneDrive. Na konci vypíše HOTOVO. Při selhání se služba nepřepne.
 Po dokončení lze dočasný Termius port forwarding vypnout.
 

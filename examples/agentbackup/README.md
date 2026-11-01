@@ -1,6 +1,6 @@
-# AgentBackup 0.1.1
+# AgentBackup 0.1.2
 
-Hourly age-encrypted application recovery capsules and optional rclone OneDrive
+Daily age-encrypted application recovery capsules and optional rclone OneDrive
 copy with SHA256 full-download verification. Runtime: Python stdlib, verified age
 and rclone; optional pg_dump/pg_restore for the wiki database. No sudo.
 
@@ -20,8 +20,8 @@ explain recovery. The private recovery identity never belongs on the production 
 
 No unattended offsite success until server OAuth authorization AND an actual
 upload/download hash check pass. Chat connector tokens are not extracted/reused.
-The OneDrive remote is rooted to the dedicated existing folder, but OAuth scopes
-may permit access elsewhere in the user's OneDrive: root scoping is not an OAuth
+The OneDrive remote targets the dedicated existing folder by an explicit path, but OAuth scopes
+may permit access elsewhere in the user's OneDrive: path scoping is not an OAuth
 security boundary. Request only Files.ReadWrite offline_access; no SharePoint search.
 
 Snapshots of different applications do not form a global transaction. Sources
@@ -39,3 +39,7 @@ a bounded execution timeout. A failed transfer remains visibly failed; no fake s
 Tests: WAL SQLite snapshot and complete source recovery, credential/symlink exclusion,
 tampered archive rejection before extraction; actual local capsule sandbox rehearsal
 recorded privately. No test is claimed for unattended OneDrive until authorization.
+
+Version0.1.2 requires an explicit destination folder path; do not rely on root_folder_id for write placement or prepend an absolute object path. Schedule is daily04:00Europe/Prague plus up to120seconds jitter. Remote pruning remains disabled; local last48 retention remains unchanged.
+
+Destination verification: list the configured folder after each upload and require archive name/size before readback and receipt publication. Do not rely on root_folder_id for write placement. Production remote is agentbackup:AgentOps-Backups with no root_folder_id override.

@@ -97,6 +97,17 @@ def capsule(roots, dbs, extras, output):
     os.chmod(output,0o600)
     return manifest
 
+def remote_path(remote, name):
+    """Join an explicit remote directory and basename without resetting its path."""
+    if not isinstance(remote, str) or ':' not in remote:
+        raise ValueError('A configured rclone remote is required')
+    if remote.split(':', 1)[1].startswith('/'):
+        raise ValueError('Absolute remote paths are refused')
+    remote = remote.rstrip('/')
+    if not name or '/' in name or name in ('.', '..'):
+        raise ValueError('A file basename is required')
+    return remote + ('' if remote.endswith(':') else '/') + name
+
 def run(config, local_only=False):
     cfg=json.loads(config.read_text());h=Path.home()
     state=Path(cfg['state']);state.mkdir(parents=True,exist_ok=True,mode=0o700)
@@ -137,10 +148,17 @@ def run(config, local_only=False):
         if not local_only:
             rc=Path(cfg['rclone_config'])
             if not rc.is_file(): raise RuntimeError('OneDrive server authorization missing')
-            target=cfg['remote']+'/'+output.name
+            target=remote_path(cfg['remote'],output.name)
             common=[cfg['rclone'],'--config',str(rc),'--contimeout','20s','--timeout','90s','--retries','3']
             subprocess.run(common+['copyto',str(output),target,'--immutable'],check=True,timeout=300,
                            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            listing=subprocess.run(common+['lsjson',cfg['remote'],'--files-only','--max-depth','1'],
+                                   check=True,timeout=120,capture_output=True,text=True)
+            entries=json.loads(listing.stdout)
+            if not any(item.get('Name')==output.name and item.get('Size')==output.stat().st_size
+                       and not item.get('IsDir') for item in entries):
+                raise RuntimeError('Uploaded archive missing from configured destination folder')
+            status['destination_listing_verified']=True
             downloaded=state/('.verify-'+output.name)
             try:
                 subprocess.run(common+['copyto',target,str(downloaded),'--immutable'],check=True,timeout=300,
@@ -152,7 +170,7 @@ def run(config, local_only=False):
             side=output.with_suffix(output.suffix+'.json')
             verified={**status,'offsite_ok':True,'offsite_verified_at':datetime.now(timezone.utc).isoformat()}
             private_json(side,verified)
-            subprocess.run(common+['copyto',str(side),cfg['remote']+'/'+side.name,'--immutable'],check=True,timeout=120,
+            subprocess.run(common+['copyto',str(side),remote_path(cfg['remote'],side.name),'--immutable'],check=True,timeout=120,
                            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             status.update(verified)
             private_json(state/'last-offsite-success.json',status)

@@ -27,4 +27,4 @@ export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 systemctl --user daemon-reload
 systemctl --user enable --now agentbackup.timer
-printf '\nHOTOVO: hodinove sifrovane zalohy s overenym prenosem na OneDrive jsou aktivni.\n'
+printf '\nHOTOVO: denni sifrovane zalohy s overenym prenosem na OneDrive jsou aktivni.\n'

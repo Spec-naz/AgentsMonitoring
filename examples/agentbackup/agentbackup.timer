@@ -1,8 +1,8 @@
 [Unit]
-Description=Hourly encrypted recovery capsule
+Description=Daily encrypted application backup
 
 [Timer]
-OnCalendar=*-*-* *:10:00
+OnCalendar=*-*-* 04:00:00 Europe/Prague
 RandomizedDelaySec=120
 Persistent=true
 Unit=agentbackup.service

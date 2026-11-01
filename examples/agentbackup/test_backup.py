@@ -2,11 +2,18 @@ import tempfile,unittest,zipfile,json,sqlite3
 import contextlib,io,subprocess
 from unittest.mock import patch
 from pathlib import Path
-from backup import capsule,sqlite_copy,run
+from backup import capsule,sqlite_copy,run,remote_path
 from continuity_restore import restore_backup,ContinuityError
 class BackupTests(unittest.TestCase):
+ def test_remote_paths_preserve_backend_folder_root(self):
+  # Preserve an explicit directory and refuse an absolute path reset.
+  self.assertEqual(remote_path('fixture:', 'backup.age'), 'fixture:backup.age')
+  self.assertEqual(remote_path('fixture:folder/', 'backup.age'), 'fixture:folder/backup.age')
+  with self.assertRaises(ValueError):remote_path('fixture:/folder','backup.age')
+  with self.assertRaises(ValueError):remote_path('fixture:/','backup.age')
+  with self.assertRaises(ValueError):remote_path('fixture:','../backup.age')
  def test_remote_receipt_and_failure_truthfulness(self):
-  for failure in (None,'archive','receipt'):
+  for failure in (None,'archive','placement','receipt'):
    with self.subTest(failure=failure),tempfile.TemporaryDirectory() as t:
     w=Path(t);src=w/'source';src.mkdir();(src/'a.py').write_text('x=1')
     note=w/'note';note.write_text('recovery');rc=w/'rclone.conf';rc.write_text('fixture')
@@ -17,6 +24,9 @@ class BackupTests(unittest.TestCase):
     remote={};receipts=[]
     def transport(args,**kwargs):
      if args[0]=='fixture-age':Path(args[args.index('-o')+1]).write_bytes(b'fixture encrypted');return
+     if 'lsjson' in args:
+      entries=[] if failure=='placement' else [dict(Name=k.rsplit('/',1)[-1],Size=len(v),IsDir=False) for k,v in remote.items()]
+      return subprocess.CompletedProcess(args,0,stdout=json.dumps(entries))
      i=args.index('copyto');source,target=args[i+1:i+3]
      if source.startswith('fixture:'):Path(target).write_bytes(remote[source]);return
      data=Path(source).read_bytes()
@@ -32,7 +42,7 @@ class BackupTests(unittest.TestCase):
     self.assertEqual(attempt['offsite_ok'],failure is None)
     self.assertEqual(result,0 if failure is None else 1)
     self.assertEqual((state/'last-offsite-success.json').exists(),failure is None)
-    if failure!='archive':
+    if failure not in ('archive','placement'):
      self.assertEqual(len(receipts),1);self.assertTrue(receipts[0]['offsite_ok'])
      self.assertIn('offsite_verified_at',receipts[0])
  def test_unreadable_subtree_fails_closed(self):

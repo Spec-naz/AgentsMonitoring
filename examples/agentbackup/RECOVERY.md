@@ -42,7 +42,7 @@ Před nasazením na jiný host ověřit konfiguraci, závislosti a cesty pro dan
    novou instanci a vyřešit mezitím provedené akce; nevracet slepě starou DB.
 
 ## Plán, kapacita a návrat
-Každou hodinu nový šifrovaný archiv; další přenos jen po serverovém přihlášení
+Každý den kolem04:00Europe/Prague nový šifrovaný archiv; další přenos jen po serverovém přihlášení
 rclone. Upload je kopie, nikdy sync. Po uploadu se archiv stáhne a ověří SHA256.
 Lokálně uchovat posledních48, ale staré lokální soubory mazat pouze s dokladem
 úspěšného offsite přenosu. Vzdálené soubory se automaticky nemažou. Nastavení
