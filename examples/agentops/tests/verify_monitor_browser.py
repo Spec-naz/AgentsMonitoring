@@ -1,5 +1,6 @@
 """Synthetic plugin acceptance against an existing AgentsMonitoring checkout."""
 import argparse
+import fcntl
 import asyncio
 import importlib.util
 import json
@@ -32,6 +33,31 @@ async def verify(source, out):
         # Normalize through the same contract as a production worker.
         tables = [{**table, 'id': 'agentops:' + table['id'],
                    'rows': [plugins.row(row, provider.id) for row in table['rows']]} for table in raw['tables']]
+    worker_spec = importlib.util.spec_from_file_location('worker_plugin', Path(__file__).parents[1] / 'monitor-worker/plugin.py')
+    worker_module = importlib.util.module_from_spec(worker_spec)
+    worker_spec.loader.exec_module(worker_module)
+    with tempfile.TemporaryDirectory() as worker_temporary:
+        worker_root = Path(worker_temporary)
+        profile = worker_root / 'config.yaml'
+        profile.write_text('model:\n  default: claude-haiku-5-5\n  provider: claude-subscription-directsdk-experimental\n')
+        launcher = worker_root / 'run.py'
+        launcher.write_text('fixture')
+        worker_configs = []
+        for index in range(3):
+            worker_state = worker_root / str(index)
+            worker_state.mkdir()
+            worker_configs.append({'id': 'worker-' + str(index), 'name': 'Hermík ' + str(index + 2),
+                'model': 'claude-haiku-5-5', 'provider': 'claude-subscription-directsdk-experimental',
+                'quota_label': 'Claude Max sdílené', 'config_path': str(profile),
+                'launcher_path': str(launcher), 'state_dir': str(worker_state)})
+        (worker_root / '2/unresolved.json').write_text('{}')
+        with (worker_root / '1/run.lock').open('w') as held:
+            fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            worker_raw = worker_module.collect({}, {'workers': worker_configs})
+        # Production installs this explicit module first (00-task-workers).
+        tables[0:0] = [{**table, 'id': 'task-workers:' + table['id'],
+                        'rows': [plugins.row(row, 'task-workers') for row in table['rows']]}
+                       for table in worker_raw['tables']]
     state = {'time': time.time(), 'agents': [], 'services': [], 'columns': [], 'plugin_errors': [],
              'agent_tables': tables, 'core': {'version': 'fixture', 'state': 'clean'}}
     async def route(request):
@@ -57,8 +83,20 @@ async def verify(source, out):
                     await page.route('**/*', route)
                     await page.goto('http://fixture.test/')
                     await page.get_by_text('Handoff not accepted', exact=True).wait_for()
+                    worker_section = page.locator('section[data-svc="task-workers:workers"]')
+                    assert await worker_section.get_attribute('data-collapsed') == '0'
+                    await page.get_by_text('Připraven', exact=True).wait_for()
+                    signal_section = page.locator('section[data-svc="agentops:signals"]')
+                    if await signal_section.get_attribute('data-collapsed') == '1':
+                        await signal_section.locator('.svc-head').click()
                     await page.get_by_text('Possible input dialog', exact=True).wait_for()
                     await page.get_by_text('Turn ended (hook)', exact=True).wait_for()
+                    worker_section = page.locator('section[data-svc="task-workers:workers"]')
+                    if await worker_section.get_attribute('data-collapsed') == '1':
+                        await worker_section.locator('.svc-head').click()
+                    for status in ('Připraven', 'Pracuje', 'Vyžaduje zásah'):
+                        await page.get_by_text(status, exact=True).wait_for()
+                    assert await page.get_by_text('Task workers', exact=True).count() == 1
                     assert await page.locator('img').count() == 0
                     assert await page.evaluate('window.PWNED || null') is None
                     assert await page.evaluate('document.documentElement.scrollWidth <= innerWidth')
