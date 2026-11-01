@@ -32,6 +32,13 @@ def main(argv=None) -> int:
     rs = sub.add_parser("restart", help="restart supervised agents (resuming their conversation)")
     rs.add_argument("names", nargs="*", help="agent names; omit with --all")
     rs.add_argument("--all", action="store_true", help="every enabled agent that is running")
+    usage = sub.add_parser('antigravity-usage', help='install or collect official Antigravity quota metadata')
+    usage.add_argument('operation', choices=['install', 'collect'])
+    usage.add_argument('--profile', required=True)
+    usage.add_argument('--pool', required=True)
+    usage.add_argument('--snapshot-dir')
+    usage.add_argument('--profile-home')
+    usage.add_argument('--apply', action='store_true')
     sub.add_parser("status", help="print live status")
     ka = sub.add_parser("keepalive", help="restart anything that died")
     ka.add_argument("--loop", action="store_true", help="run continuously")
@@ -43,6 +50,18 @@ def main(argv=None) -> int:
     un.add_argument("--yes", action="store_true")
     args = p.parse_args(argv)
 
+    if args.command == 'antigravity-usage':
+        if args.operation == 'install' and not args.profile_home:
+            p.error('antigravity-usage install requires --profile-home')
+        from . import antigravity_usage
+        options = [args.operation, '--profile', args.profile, '--pool', args.pool]
+        if args.snapshot_dir: options.extend(['--snapshot-dir', args.snapshot_dir])
+        if args.operation == 'install':
+            options.extend(['--profile-home', args.profile_home])
+            if args.apply: options.append('--apply')
+        elif args.apply or args.profile_home:
+            p.error('--apply and --profile-home are installation options')
+        return antigravity_usage.main(options)
     if args.command == "status":
         from . import status
         print(status.render())

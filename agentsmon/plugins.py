@@ -21,7 +21,7 @@ import time
 
 API_VERSION=1
 ID=re.compile(r'[a-z][a-z0-9_-]{0,63}\Z')
-PUBLIC_FIELDS={'id','name','kind','label','vendor','alive','session_id','age','port','latency_ms','tmux_session','account'}
+PUBLIC_FIELDS={'id','name','kind','label','vendor','alive','session_id','conversation_id','age','port','latency_ms','tmux_session','account'}
 ROW_FIELDS=PUBLIC_FIELDS | {'status','status_detail','telegram_bot','telegram_url','name_color','metadata_error','row_actions','cells','actions_locked'}
 
 
@@ -147,9 +147,10 @@ def discover(cfg):
                     found.append(Plugin(name,'?',{}, {},error='Missing, ambiguous or invalid entry point metadata'))
         except Exception:
             found.append(Plugin('entry-points','?',{}, {},error='Invalid entry point configuration or discovery failed'))
-    if cfg.get('usage_plugin'):
+    antigravity_auto = any(a.get('kind') == 'antigravity' for a in cfg.get('agents', []) if isinstance(a, dict))
+    if cfg.get('usage_plugin') or antigravity_auto:
         try:
-            add({'api_version':1,'id':'usage','version':'1.0.0','settings':cfg['usage_plugin']},
+            add({'api_version':1,'id':'usage','version':'1.0.0','settings':cfg.get('usage_plugin') or {}},
                 {'type':'entry','value':'agentsmon.usage_plugin'})
         except Exception:
             found.append(Plugin('usage','?',{}, {},error='Invalid or duplicate usage plugin'))
@@ -285,7 +286,9 @@ _refreshing=False
 
 def manager(cfg):
     global _manager,_signature,_cache
-    signature=json.dumps({k:cfg.get(k) for k in ('modules_dir','plugin_entry_points','usage_plugin')},sort_keys=True)
+    signature_data = {k:cfg.get(k) for k in ('modules_dir','plugin_entry_points','usage_plugin')}
+    signature_data['antigravity_usage_enabled'] = any(a.get('kind') == 'antigravity' for a in cfg.get('agents', []) if isinstance(a, dict))
+    signature=json.dumps(signature_data,sort_keys=True)
     with _lock:
         if _manager is None or signature!=_signature:
             _manager=Manager(cfg); _signature=signature; _cache=None

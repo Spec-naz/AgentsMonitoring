@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0.dev6 — 2026-11-01
+
+- Collect allowlisted official Antigravity statusLine quota metadata into private
+  conversation-UUID snapshots; never persist email, cwd, titles, transcripts, context
+  tokens, subagents or estimated costs. Convert remaining fractions to labelled used
+  percentages; remaining amounts keep unspecified units instead of dollar claims.
+- Automatically attach Usage readings to registered Antigravity conversation IDs
+  without per-agent source mappings; profile/pool labels remain explicitly configured.
+- Add an explicit profile statusLine installer preserving native UI and refusing
+  existing unrelated hooks. It starts no sessions or services and makes no model calls.
+
 ## 0.4.0.dev5 — 2026-10-31 · Quick links, Czech hints
 
 - **Czech hints** (Michal is not a developer): fixed Czech explanations embedded in the page for header
