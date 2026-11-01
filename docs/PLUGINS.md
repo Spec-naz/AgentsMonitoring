@@ -73,8 +73,8 @@ Every response is JSON-serializable. Optional response fields:
   Core target: exact row name. Plugin target: `plugin:table:row`. Used for model/account
   detectors or usage columns. `account` appears in the model's tooltip. Cannot alter liveness,
   session identity or core actions.
-- `cells`: map of column ID to string or `{text, title?, tone?, bars?}`. Tone is `muted`,
-  `ok`, `warning` or `error`; at most four bars `{label, percent, title?}`, percent 0–100.
+- `cells`: map of column ID to string or `{text, title?, tone?, bars?, quota_group?}`. Tone is `muted`,
+  `ok`, `warning` or `error`; at most four bars `{label, percent, title?, resets_at?}`, percent 0–100.
 - `hidden_sessions`: up to 200 exact tmux names to hide from the core table.
   Generic config `hidden_sessions` remains available and supports its existing patterns.
 - `hidden_services`: exact service names whose duplicate display should be suppressed.
@@ -176,3 +176,17 @@ API/version/entry-point failures, scoped actions, actual HTTP authentication/gua
 account separation, integrity and a clean-HOME `install.sh --no-setup --no-pip` launch.
 Optional real browser: `python3 tests/verify_plugins_browser.py --browser /path/to/chrome
 --out /tmp/browser-evidence` (Playwright installed separately). It uses local fixtures only.
+
+
+### Remaining quota panel
+
+The built-in `usage:limits` column alone feeds the remaining-capacity panel; arbitrary
+plugin bars are not subscription quotas. Optional `resets_at` is finite nonnegative
+epoch seconds. Optional `quota_group` must match `source-` plus64lowercase hex digits.
+The usage adapter derives it only from an exact operator-declared source path,
+format and account label. Only identical entire readings with the same key combine.
+This is display deduplication, not account authentication or a financial ledger.
+The hash does not expose the raw path, but is not an anonymization guarantee.
+Antigravity pool labels never infer a shared account; distinct readings stay separate.
+Cached-prefix metadata stays last-known, unknown readings never invent capacity,
+and the panel labels100-used as remaining without summing shared limits.

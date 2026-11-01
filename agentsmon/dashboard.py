@@ -126,6 +126,7 @@ PAGE = r"""<!DOCTYPE html><html lang="en"><head>
   </header>
   <p class="signal-note">Process status does not verify task activity or Telegram delivery.</p>
   <nav id="links" class="links" aria-label="Links" hidden><span class="links-label" data-hint="links">Links</span><div class="links-list"></div></nav>
+  <section id="quota" class="quota" aria-label="Subscription limits" hidden><span class="links-label" data-hint="quota">Plan limits · remaining</span><div class="quota-list"></div></section>
 AGENT_TABLES
   <section id="eco" class="eco mb-6" aria-label="Security and ecosystem">
     <div class="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 bg-white border-slate-200">
@@ -498,6 +499,7 @@ const HINTS={
   "tmux up":"Kolik agentů v terminálových relacích (tmux) má spuštěný proces. Služby na pozadí se nepočítají. Běžící proces neznamená, že agent právě pracuje.",
   "attention":"Agenti, kteří jsou zastavení, potřebují se přihlásit, nebo o nich máme neúplná data. Číslo ukazuje, kam se podívat, ne co přesně se stalo.",
   "eco":"Kontrola serveru bez správcovských práv. Záložky: Security = bezpečnostní kontroly, Access = kdo má jaké přístupy (jen názvy, nikdy hesla), Ecosystem = co na serveru běží.",
+  "quota":"Kolik ti zbývá z kvót předplatného. Kruh ukazuje ZBÝVAJÍCÍ kapacitu daného okna, ne peníze nebo zůstatek GCP kreditů. Sdílené limity se nesčítají; jeden společný odečet slučujeme jen pro stejný výslovně nastavený zdroj. Starší snímek je poslední známý stav, ne důkaz, že agent právě nepracuje. Čte místní metadata bez modelového volání a bez hesel.",
   "links":"Rychlé odkazy na další nástroje (např. Mozek). Otevírají se v nové záložce. Některé mohou vyžadovat přihlášení.",
   "col-agent":"Jméno agenta. Klik na jméno zkopíruje příkaz pro připojení do jeho terminálu.",
   "col-model":"Model, nebo odkud údaj pochází (např. „codex hook“ = hlášení přímo z aplikace Codex).",
@@ -647,6 +649,45 @@ function renderLinks(links){
   nav.hidden=!list.length;
   q(nav,".links-list").innerHTML=list.map(l=>`<a class="link-chip" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"${l.note?` title="${esc(l.note)}"`:""}><span class="link-title">${esc(l.title)}</span><span class="link-host">${esc(l.host)}</span><span class="link-arrow" aria-hidden="true">↗</span></a>`).join("");
 }
+// ---- Plan limits: remaining quota rings built from usage cells (bars with resets_at) ---------
+function fmtLeft(sec){
+  if(!(sec>0)) return "now";
+  const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60);
+  return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${Math.max(1,m)}m`;
+}
+function quotaLabel(l){ l=String(l||"").replace(/ used$/,""); return l==="5h"?"5-hour":l==="7d"?"weekly":l; }
+let quotaKey="";
+function renderQuota(d){
+  const rows=[...(d.agents||[]),...(d.agent_tables||[]).flatMap(t=>t.rows||[])];
+  const cards=[];
+  rows.forEach(a=>(d.columns||[]).forEach(c=>{
+    if(c.id!=="usage:limits") return;
+    const cell=(a.cells||{})[c.id];
+    if(!(cell&&typeof cell==="object"&&Array.isArray(cell.bars)&&cell.bars.length)) return;
+    // Exact declared source only; matching provider labels/percentages never imply a shared account.
+    const account=String(cell.title||"").includes(" · Antigravity statusLine")?String(cell.title).split(" · Antigravity statusLine")[0]:String(cell.title||"").split(" · ")[0];
+    const same=cell.quota_group&&cards.find(k=>k.cell.quota_group===cell.quota_group&&JSON.stringify(k.cell)===JSON.stringify(cell));
+    if(same) same.name+=", "+(a.label||a.name);
+    else cards.push({name:a.label||a.name,account,cell});
+  }));
+  const box=document.getElementById("quota"); box.hidden=!cards.length;
+  const now=Date.now()/1000, key=JSON.stringify([cards,Math.floor(now/30)]); if(key===quotaKey) return; quotaKey=key;
+  const R=40, C=2*Math.PI*R;
+  q(box,".quota-list").innerHTML=cards.map(({name,account,cell})=>{
+    const stale=/^Cached(?: ·|$)/.test(cell.text||"");
+    const rings=cell.bars.map(b=>{
+      const left=Math.max(0,Math.min(100,100-b.percent)), lvl=left<=10?"low":left<=30?"mid":"ok";
+      const reset=b.resets_at?`resets in ${fmtLeft(b.resets_at-now)}`:"reset unknown";
+      return `<div class="q-ring" data-level="${lvl}" title="${esc(b.title)}">`+
+        `<svg viewBox="0 0 100 100" role="img" aria-label="${esc(quotaLabel(b.label))} limit: ${Math.round(left)}% remaining, ${esc(reset)}">`+
+        `<circle class="q-track" cx="50" cy="50" r="${R}"/>`+
+        `<circle class="q-arc" cx="50" cy="50" r="${R}" transform="rotate(-90 50 50)" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${(C*(1-left/100)).toFixed(2)}"/>`+
+        `<text x="50" y="56" text-anchor="middle">${Math.round(left)}%</text></svg>`+
+        `<div class="q-meta"><strong>${esc(quotaLabel(b.label))}</strong><span>${esc(reset)}</span></div></div>`;
+    }).join("");
+    return `<article class="quota-card${stale?" is-stale":""}"><header><span class="q-name">${esc(name)}</span><span class="q-account">${esc(account)}</span>${stale?'<span class="q-stale" title="No fresh reading in the last 10 minutes; showing the last known value">last known</span>':""}</header><div class="q-rings">${rings}</div></article>`;
+  }).join("");
+}
 async function refresh(){
   if(refreshBusy)return; refreshBusy=true;
   try{
@@ -661,6 +702,7 @@ async function refresh(){
     document.getElementById("metric-attention-box").dataset.alert=attention?"true":"false";
     renderGauge(d.agents);
     renderLinks(d.links);
+    renderQuota(d);
     const agentsRoot=document.querySelector('section[data-svc="agents"]');
     renderAgents(agentsRoot, d.agents, null, d.columns||[]); initCollapse(agentsRoot,"agents",0);
     const tables=document.getElementById("plugin-tables");

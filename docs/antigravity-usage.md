@@ -73,3 +73,10 @@ metadata events may therefore transiently hide a prior quota. Invalid model IDs
 become unknown model metadata while a valid quota remains usable. Reset epochs
 outside0..observation+366days are rejected, including millisecond timestamps.
 All percentages describe quota, not a monetary balance.
+
+
+The optional Plan limits panel displays remaining fractions separately from the
+roster's used percentages. It preserves explicit profile/pool labels, Cached-prefix
+staleness and distinct conversation readings; matching percentages/profile names
+do not merge accounts. Remaining amounts with unspecified units are not quota
+percentages or monetary balances and cannot create rings without a fraction.

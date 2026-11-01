@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0.dev7 — 2026-11-01 · Reviewed plan limits panel
+
+- Render only built-in Usage quotas, preserve explicit Antigravity pool labels and stale prefixes; identical percentages never infer shared accounts. Deduplicate only an exact operator-declared source identity with identical freshness/values. Source grouping hashes do not expose local paths and do not prove account authentication.
+- New **Plan limits · remaining** panel under Links: one card per row that has usage bars, with a ring
+  per window (5-hour / weekly) showing the **remaining** share (100 − used) and a „resets in …“ countdown.
+  Green > 30 %, amber ≤ 30 %, red ≤ 10 %. Readings older than 10 minutes are dimmed and tagged „last known“.
+  Rows reading the same account (e.g. Codex CLI and Hermes on one ChatGPT plan) share one card.
+  Hidden when no usage source is configured. Czech hint `quota`.
+- Usage bars may carry an optional numeric `resets_at` (finite, nonnegative epoch seconds; validated in
+  `plugins.cell`). The built-in usage plugin fills it from the snapshot; the column bars are unchanged.
+- Still local snapshots only: no OAuth token reads or network calls. Producers are operator-side (Claude
+  statusLine writing `rate_limits`, Codex snapshot from the newest rollout). Tests in `tests/test_usage_plugin.py`.
+
 ## 0.4.0.dev6 — 2026-11-01
 
 - Collect allowlisted official Antigravity statusLine quota metadata into private

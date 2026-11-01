@@ -47,6 +47,8 @@ jobs:
           python tests/verify_compact_browser.py --out browser-evidence/compact
           python tests/verify_ecosystem_browser.py --out browser-evidence/ecosystem
           python tests/verify_czech_hints_browser.py --out browser-evidence/hints
+          python tests/verify_antigravity_usage_browser.py --out browser-evidence/antigravity
+          python tests/verify_plan_limits_browser.py --out browser-evidence/plan-limits
       - uses: actions/upload-artifact@v4
         if: always()
         with:

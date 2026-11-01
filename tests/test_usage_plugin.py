@@ -29,3 +29,46 @@ class AccountUsage(unittest.TestCase):
                 'primary':{'used_percent':42,'window_minutes':180,'resets_at':2_000_000_000}}}})+'\n')
             result=usage.read_source({'path':str(p),'format':'codex-rollout'},1_800_000_000)
             self.assertEqual(result['bars'][0]['label'],'3h')
+
+
+class QuotaPanelData(unittest.TestCase):
+    def test_bars_carry_numeric_reset_for_the_remaining_panel(self):
+        b=usage.window('5h',30,2_000_000_000,100)
+        self.assertEqual(b['resets_at'],2_000_000_000)
+        self.assertNotIn('resets_at',usage.window('5h',30,None,100))
+
+    def test_plugin_cell_validation_accepts_only_finite_nonnegative_reset(self):
+        from agentsmon import plugins
+        ok=plugins.cell({'text':'','bars':[{'label':'5h','percent':10,'resets_at':2_000_000_000}]})
+        self.assertEqual(ok['bars'][0]['resets_at'],2_000_000_000)
+        for bad in (-1,float('inf'),'2030',True):
+            with self.assertRaises(ValueError):
+                plugins.cell({'bars':[{'label':'5h','percent':10,'resets_at':bad}]})
+
+
+class QuotaPanelPage(unittest.TestCase):
+    def test_page_has_hidden_quota_panel_with_czech_hint(self):
+        from agentsmon import dashboard
+        src=Path(dashboard.__file__).read_text()
+        self.assertIn('id="quota" class="quota" aria-label="Subscription limits" hidden',src)
+        self.assertIn('"quota":"Kolik ti zbývá',src)
+        self.assertIn('renderQuota(d);',src)
+
+
+class ExplicitQuotaGrouping(unittest.TestCase):
+    def test_equal_labels_and_values_do_not_merge_distinct_sources(self):
+        from agentsmon import plugins
+        with tempfile.TemporaryDirectory() as d:
+            first,second=Path(d)/'one.json',Path(d)/'two.json'
+            body=json.dumps({'rate_limits':{'five_hour':{'used_percentage':20,'resets_at':2000000000}}})
+            first.write_text(body);second.write_text(body)
+            spec={'path':str(first),'format':'claude-statusline','account':'Shared declaration'}
+            a=usage.read_source(spec,1800000000);b=usage.read_source(dict(spec),1800000000)
+            other=usage.read_source({**spec,'path':str(second)},1800000000)
+            unnamed=usage.read_source({'path':str(first),'format':'claude-statusline'},1800000000)
+            self.assertEqual(a['quota_group'],b['quota_group'])
+            self.assertNotEqual(a['quota_group'],other['quota_group'])
+            self.assertNotIn('quota_group',unnamed)
+            self.assertNotIn(str(first),json.dumps(plugins.cell(a)))
+            for bad in ('source-'+('0'*63),'account-one',None,True):
+                with self.assertRaises(ValueError):plugins.cell({'quota_group':bad})
