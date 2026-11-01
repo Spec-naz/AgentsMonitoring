@@ -54,11 +54,31 @@ def model_config(path, expected_model, expected_provider):
         raise ValueError('Unexpected profile model/provider')
 
 
+def configured_path(config, key):
+    value = config[key]
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError('Expected nonempty configured path')
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        raise ValueError('Configured path must expand to an absolute path')
+    return path
+
+
+def marker_exists(path):
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    return True
+
+
 def worker_state(config):
     """An observed held wrapper lock means local activity, never proven task progress."""
-    profile = Path(config['config_path']).expanduser()
-    launcher = Path(config['launcher_path']).expanduser()
-    state = Path(config['state_dir']).expanduser()
+    profile = configured_path(config, 'config_path')
+    launcher = configured_path(config, 'launcher_path')
+    state = configured_path(config, 'state_dir')
+    if not isinstance(config.get('provider'), str) or not config['provider'].strip():
+        raise ValueError('Expected nonempty provider')
     model_config(profile, config['model'], config['provider'])
     regular(launcher)
     try:
@@ -75,11 +95,12 @@ def worker_state(config):
                 fcntl.flock(descriptor, fcntl.LOCK_SH | fcntl.LOCK_NB)
             except BlockingIOError:
                 return 'working'
-            # Shared probes coexist; an active wrapper holds an exclusive lock.
-            return 'attention' if os.path.lexists(marker) else 'ready'
+            # Keep the shared lock through the marker check: releasing it first could
+            # miss a new wrapper's exclusive lock and unresolved marker.
+            return 'attention' if marker_exists(marker) else 'ready'
     except FileNotFoundError:
         # Any marker, even a dangling symlink or unreadable one, requires intervention.
-        return 'attention' if os.path.lexists(marker) else 'ready'
+        return 'attention' if marker_exists(marker) else 'ready'
 
 
 def collect(context, settings):

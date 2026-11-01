@@ -1,3 +1,4 @@
+import errno
 import fcntl
 import importlib.util
 import json
@@ -126,6 +127,64 @@ class WorkerMonitorTests(unittest.TestCase):
             self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
         with self.assertRaises(ValueError):
             plugin.collect({}, {'workers': [dict(self.config, id=42)]})
+
+    def test_missing_empty_or_relative_registration_paths_require_intervention(self):
+        original = dict(self.config)
+        for key in ('config_path', 'launcher_path', 'state_dir'):
+            for value in (None, '', '   ', 'relative/path', '.', 42):
+                with self.subTest(key=key, value=value):
+                    self.config = dict(original, **{key: value})
+                    self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
+            self.config = dict(original)
+            del self.config[key]
+            with self.subTest(key=key, missing=True):
+                self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
+        self.config = original
+
+    def test_empty_missing_or_nonstring_provider_requires_intervention(self):
+        for value in (None, '', '   ', 42):
+            with self.subTest(value=value):
+                self.config['provider'] = value
+                self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
+        del self.config['provider']
+        self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
+
+    def test_marker_permission_and_io_errors_require_intervention_with_or_without_lock(self):
+        marker = self.state / 'unresolved.json'
+        original_lstat = Path.lstat
+        for with_lock in (False, True):
+            if with_lock:
+                (self.state / 'run.lock').write_text('')
+            for error in (PermissionError(errno.EACCES, 'fixture'), OSError(errno.EIO, 'fixture')):
+                def checked_lstat(path, *args, **kwargs):
+                    if path == marker:
+                        raise error
+                    return original_lstat(path, *args, **kwargs)
+                with self.subTest(lock=with_lock, error=error.errno):
+                    with patch.object(Path, 'lstat', checked_lstat):
+                        self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
+
+    def test_shared_lock_is_held_until_marker_check_finishes(self):
+        lock = self.state / 'run.lock'
+        lock.write_text('')
+        original_exists = plugin.marker_exists
+        checked = []
+        def check_marker(path):
+            with lock.open('r') as contender:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            checked.append(True)
+            return original_exists(path)
+        with patch.object(plugin, 'marker_exists', side_effect=check_marker):
+            self.assertEqual(self.row()['status'], 'Připraven')
+        self.assertEqual(checked, [True])
+        with lock.open('r') as contender:
+            fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_dangling_marker_also_requires_intervention_with_existing_unheld_lock(self):
+        (self.state / 'run.lock').write_text('')
+        (self.state / 'unresolved.json').symlink_to(self.root / 'missing-marker-target')
+        self.assertEqual(self.row()['status'], 'Vyžaduje zásah')
 
     def test_worker_table_is_independent_of_missing_task_snapshot(self):
         # No snapshot path is configured or accessed by this optional plugin.

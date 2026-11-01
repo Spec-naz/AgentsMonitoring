@@ -25,7 +25,10 @@ The config check reads at most 64KiB of a regular non-symlink UTF-8 config and c
 the simple `model:` section's unquoted provider/default metadata. It does not parse
 or validate all YAML settings. Unsupported formatting is intervention-required,
 not silently accepted. The launcher must exist as a regular file; its contents are
-not read. Registration paths are trusted local administrator configuration.
+not read. Registration paths are trusted local administrator configuration. Each path must be a
+nonempty string expanding to an absolute path, and provider must be a nonempty string.
+An absent marker is distinguished from failed marker inspection: only FileNotFoundError
+means absent; permission and I/O errors require intervention.
 
 - **Připraven:** metadata matches and no active wrapper lock or unresolved marker
   was observed. The wrapper checks subscription login and extra usage only when
@@ -41,7 +44,9 @@ not read. Registration paths are trusted local administrator configuration.
 The probe opens existing lock files read-only, does not create/truncate them and
 briefly acquires/relinquishes a shared flock if no exclusive wrapper lock is held.
 Concurrent monitor probes coexist; a wrapper attempting its exclusive nonblocking lock
-during the brief probe may safely refuse that start, requiring a later explicit retry. This observation is not an atomic
+during the brief probe may safely refuse that start, requiring a later explicit retry.
+The shared lock stays held through marker inspection to avoid a new-wrapper snapshot
+race; this tiny contention window is intentional. This observation is not an atomic
 systemwide health guarantee. Concurrent jobs can begin after the observation.
 No prompt, reply, runtime log, receipt, private project name, credential or marker
 contents are read or displayed. Shared quota is labelled, never duplicated as a
