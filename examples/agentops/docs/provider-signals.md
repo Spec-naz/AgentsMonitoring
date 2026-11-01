@@ -115,3 +115,16 @@ ambiguous or mismatched observations remain unknown. A declared actor is not aut
 - A long turn over `running_max_age` is reported as `unknown`, not as stuck.
 - `turn_running` means a provider turn is open, not that the task advances.
 - Codex behaviour was verified from docs and binary strings, not by a live trusted hook run.
+
+## Dashboard visibility (2026-11-01)
+
+The Signals table displays supported fresh bound lifecycle states and repeated modal hints.
+Missing, expired or unbound observations do not create a red failure row; if no useful
+observations remain, the table is omitted. This does not mean agents are healthy.
+Raw diagnostic reasons remain in the private snapshot and provider status CLI.
+Actual failed turns take precedence over terminal hints. Ended provider sessions alone are omitted rather than painted as failed;
+an independent repeated terminal hint may still be shown, including for an unbound new session.
+A repeated modal hint also takes precedence over turn_running: a start event cannot
+prove that an approval dialog is absent. Fresh idle/failed/waiting hook states win. A neutral count in the task table always reports current
+signal coverage, including when the signals panel is empty. Fixed session bindings require maintenance across
+new sessions; automatic rebinding is not introduced by this display change.

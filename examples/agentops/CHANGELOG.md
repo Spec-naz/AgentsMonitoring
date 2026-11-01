@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1 — 2026-11-01
+
+- Show only active ledger tasks in the Work queue; exclude reviewed/completed and
+  cancelled tasks before the 100-row limit. Full task and event history remains in AgentOps.
+
+- Hide missing or expired provider observations instead of showing them as failed agents;
+  retain real hook failures and repeated input hints. Empty signals table is omitted.
+
 ## 0.2.0 — 2026-10-31
 
 - Observe allowlisted Claude Code and native Codex lifecycle hook metadata with
