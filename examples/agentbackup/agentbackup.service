@@ -1,0 +1,14 @@
+[Unit]
+Description=Agent application recovery capsule
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.agentbackup-prod/current/backup.py --config %h/.config/agentbackup/settings.json --local-only
+UMask=0077
+NoNewPrivileges=true
+Nice=10
+IOSchedulingClass=idle
+CPUQuota=25%
+MemoryMax=768M
+TasksMax=64
+TimeoutStartSec=15min

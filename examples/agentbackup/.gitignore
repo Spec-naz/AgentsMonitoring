@@ -1,0 +1,7 @@
+__pycache__/
+*.zip
+*.age
+*.dump
+*.sqlite*
+settings.json
+rclone.conf

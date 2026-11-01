@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted application backup
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Europe/Prague
+RandomizedDelaySec=120
+Persistent=true
+Unit=agentbackup.service
+
+[Install]
+WantedBy=timers.target
