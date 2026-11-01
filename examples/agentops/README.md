@@ -1,4 +1,4 @@
-# AgentOps reference — 0.2.0
+# AgentOps reference — 0.2.2
 
 A small, dependency-free operational layer alongside AgentsMonitoring. It records
 explicit tasks and handoff acceptance, independent review, append-only events,
@@ -109,3 +109,9 @@ python3 -m pyflakes agentops monitor tests
 Tests use isolated fixture directories, not production credentials or services.
 Optional renderer acceptance: `tests/verify_monitor_browser.py --agentsmon PATH
 --out ARTIFACT_DIRECTORY` (Playwright installed separately).
+
+### On-demand worker visibility
+
+The optional [Task workers plugin](docs/worker-monitoring.md) shows explicitly
+registered workers independently of persistent sessions and the task snapshot.
+It makes no model/auth calls and never starts or restarts a worker.

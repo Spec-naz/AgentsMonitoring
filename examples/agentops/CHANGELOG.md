@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.3 — 2026-11-01
+
+- Fail closed on missing, empty or relative worker registration paths and empty provider
+  metadata. Marker lookup errors now require intervention instead of appearing ready.
+  Preserve the shared probe lock through marker inspection. Both edge cases were found
+  by Antigraviťák in his actual onboarding review of 0.2.2.
+
+## 0.2.2 — 2026-11-01
+
+- Add an optional explicitly registered Task workers table independent of task snapshots.
+  Metadata-only profile checks and existing wrapper lock observations distinguish ready,
+  locally working and intervention-required workers; no model calls or credential reads.
+  Shared quota labels do not duplicate usage percentages.
+
 ## 0.2.1 — 2026-11-01
 
 - Show only active ledger tasks in the Work queue; exclude reviewed/completed and
