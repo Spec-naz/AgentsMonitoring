@@ -132,6 +132,107 @@ class AntigravityUsageTests(unittest.TestCase):
         result = subprocess.run(command, input=b'PRIVATE' * 50000, capture_output=True, check=True)
         self.assertEqual((result.stdout, result.stderr), (b'', b''))
 
+    def test_managed_pinned_release_upgrade_and_rollback_preserve_original_backups(self):
+        home = self.root / 'managed-profile'
+        settings = home / '.gemini/antigravity-cli/settings.json'
+        settings.parent.mkdir(parents=True)
+        original = b'{  "other": {"order": 1}, "second": true }\n'
+        settings.write_bytes(original)
+        first = '/reviewed/releases/v1/agentsmon/antigravity_usage.py'
+        second = '/reviewed/releases/v2/agentsmon/antigravity_usage.py'
+        with patch.object(collector, '__file__', first):
+            collector.install(home, 'consumer', 'AI Pro', self.directory, apply=True)
+        wrapper = settings.parent / 'agentsmon-statusline.sh'
+        first_bytes = wrapper.read_bytes()
+        backups = list(settings.parent.glob('settings.before-agentsmon-*.json'))
+        self.assertTrue(any(p.read_bytes() == original for p in backups))
+        with patch.object(collector, '__file__', second):
+            self.assertEqual(collector.install(home, 'consumer', 'AI Pro', self.directory)['status'], 'ready-to-upgrade')
+            self.assertEqual(wrapper.read_bytes(), first_bytes)
+            result = collector.install(home, 'consumer', 'AI Pro', self.directory, apply=True)
+        self.assertEqual(result['operation'], 'upgrade')
+        self.assertIn(second.encode(), wrapper.read_bytes())
+        self.assertNotIn(b'/current/', wrapper.read_bytes())
+        wrapper_backups = list(settings.parent.glob('agentsmon-statusline.before-agentsmon-*.sh'))
+        self.assertTrue(any(p.read_bytes() == first_bytes for p in wrapper_backups))
+        with patch.object(collector, '__file__', first):
+            collector.install(home, 'consumer', 'AI Pro', self.directory, apply=True)
+        self.assertEqual(wrapper.read_bytes(), first_bytes)
+        with self.assertRaises(ValueError): collector.install(home, 'consumer', 'DIFFERENT POOL', self.directory, apply=True)
+
+    def test_partial_install_recovers_identical_owned_wrapper_but_dry_run_rejects_foreign(self):
+        home = self.root / 'partial-profile'
+        settings = home / '.gemini/antigravity-cli/settings.json'
+        settings.parent.mkdir(parents=True)
+        settings.write_text('{"untouched": true}')
+        real_write = collector.atomic_write
+        def fail_settings(path, contents):
+            if path == settings:
+                raise OSError('synthetic partial failure')
+            return real_write(path, contents)
+        with patch.object(collector, 'atomic_write', side_effect=fail_settings):
+            with self.assertRaises(OSError): collector.install(home, 'consumer', 'AI Pro', self.directory, apply=True)
+        wrapper = settings.parent / 'agentsmon-statusline.sh'
+        self.assertTrue(wrapper.exists())
+        self.assertNotIn('statusLine', json.loads(settings.read_text()))
+        self.assertEqual(collector.install(home, 'consumer', 'AI Pro', self.directory)['status'], 'ready-to-recover')
+        collector.install(home, 'consumer', 'AI Pro', self.directory, apply=True)
+        self.assertTrue(json.loads(settings.read_text())['untouched'])
+        other_home = self.root / 'foreign-profile'
+        foreign = other_home / '.gemini/antigravity-cli/agentsmon-statusline.sh'
+        foreign.parent.mkdir(parents=True)
+        foreign.write_text('# foreign command, do not modify')
+        before = foreign.read_bytes()
+        with self.assertRaises(ValueError): collector.install(other_home, 'consumer', 'AI Pro', self.directory)
+        self.assertEqual(foreign.read_bytes(), before)
+        self.assertFalse(foreign.with_name('settings.json').exists())
+
+    def test_large_integers_bad_resets_and_invalid_model_do_not_crash_or_invent_quota(self):
+        self.assertFalse(collector.number(10 ** 4000))
+        now = time.time()
+        for reset in (1e300, now * 1000, 10 ** 4000, '9999-01-01T00:00:00Z'):
+            payload = self.payload()
+            payload['quota'] = {'weekly': {'remaining_fraction': .2, 'reset_time': reset}}
+            self.snapshot(payload, now=now)
+            self.assertEqual(usage_plugin.antigravity_reading(SID, self.directory, now)['text'], 'No current reading')
+        payload = self.payload()
+        payload['model'] = {'id': {'invalid': True}}
+        data = collector.sanitize(payload, 'consumer', 'AI Pro', now)
+        self.assertIsNone(data['model'])
+        self.assertEqual(data['quota']['gemini-weekly']['remaining_fraction'], .75)
+        payload['quota'] = {'huge': {'remaining_amount': 10 ** 4000}}
+        command = [sys.executable, '-I', str(Path(collector.__file__)), 'collect', '--profile', 'consumer',
+                   '--pool', 'AI Pro', '--snapshot-dir', str(self.directory)]
+        result = subprocess.run(command, input=json.dumps(payload).encode(), capture_output=True, check=True)
+        self.assertEqual((result.stdout, result.stderr), (b'', b''))
+
+    def test_missing_empty_invalid_quota_clears_previous_reading_instead_of_fake_freshness(self):
+        now = time.time()
+        for quota in ('missing', {}, 'invalid'):
+            self.snapshot(now=now)
+            payload = self.payload()
+            if quota == 'missing': payload.pop('quota')
+            else: payload['quota'] = quota
+            self.snapshot(payload, now=now + 1)
+            value = usage_plugin.antigravity_reading(SID, self.directory, now + 2)
+            self.assertEqual(value['text'], 'No current reading')
+            self.assertNotIn('bars', value)
+            self.assertIn('not monetary balance', value['title'])
+        self.snapshot(now=now)
+        value = usage_plugin.antigravity_reading(SID, self.directory, now + 700)
+        self.assertEqual(value['text'], 'Cached')
+        self.assertIn('not monetary balance', value['title'])
+
+    def test_actual_plugin_manager_subprocess_consumes_automatic_uuid_source(self):
+        self.snapshot()
+        cfg = {'modules_dir': str(self.root / 'modules'), 'agents': [{'kind': 'antigravity'}],
+               'usage_plugin': {'antigravity_directory': str(self.directory)}}
+        result = plugins.Manager(cfg).collect([{'id': 'automatic', 'name': 'Automatic agent',
+                                               'kind': 'antigravity', 'session_id': SID}])
+        self.assertEqual(result['errors'], [])
+        self.assertEqual(result['patches'][0]['row_id'], 'automatic')
+        self.assertEqual(result['patches'][0]['cells']['usage:limits']['bars'][0]['percent'], 25)
+
     def test_automatic_plugin_discovery_and_cache_refresh_on_provider_onboarding(self):
         cfg = {'modules_dir': str(self.root / 'modules'), 'usage_plugin': None, 'agents': []}
         self.assertFalse(any(p.id == 'usage' for p in plugins.discover(cfg)))
@@ -140,6 +241,8 @@ class AntigravityUsageTests(unittest.TestCase):
         discovered = plugins.discover(cfg)
         self.assertTrue(any(p.id == 'usage' for p in discovered))
         self.assertIsNot(plugins.manager(cfg), first)
+        cfg['usage_plugin'] = False
+        self.assertFalse(any(p.id == 'usage' for p in plugins.discover(cfg)))
         with patch('agentsmon.__main__.sys.stdout'):
             from agentsmon.__main__ import main
             self.assertEqual(main(['antigravity-usage', 'install', '--profile-home', str(self.root / 'other'),

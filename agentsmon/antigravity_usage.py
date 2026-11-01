@@ -29,22 +29,30 @@ def label(value):
 
 
 def number(value):
-    return type(value) in (int, float) and math.isfinite(value)
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def reset_epoch(bucket, now):
+    maximum = now + 366 * 86400
     value = bucket.get('reset_time')
     if isinstance(value, str):
         try:
             dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
-            if dt.tzinfo is not None:
+            if dt.tzinfo is not None and 0 <= dt.timestamp() <= maximum:
                 return int(dt.timestamp())
         except (ValueError, OverflowError):
             pass
-    if number(value) and value >= 0:
+    if number(value) and 0 <= value <= maximum:
         return int(value)
     seconds = bucket.get('reset_in_seconds')
-    return int(now + seconds) if number(seconds) and 0 <= seconds <= 366 * 86400 else None
+    if number(seconds) and 0 <= seconds <= 366 * 86400:
+        return int(now + seconds)
+    if 'reset_time' in bucket or 'reset_in_seconds' in bucket:
+        raise ValueError('Invalid reset metadata')
+    return None
 
 
 def sanitize(payload, profile, pool, now=None):
@@ -58,7 +66,10 @@ def sanitize(payload, profile, pool, now=None):
     if not isinstance(sid, str) or not UUID.fullmatch(sid):
         raise ValueError('No active conversation UUID')
     model = payload.get('model')
-    model_id = label(model['id']) if isinstance(model, dict) and model.get('id') else None
+    try:
+        model_id = label(model['id']) if isinstance(model, dict) and model.get('id') else None
+    except ValueError:
+        model_id = None
     raw = payload.get('quota')
     quota = {}
     if isinstance(raw, dict):
@@ -74,7 +85,10 @@ def sanitize(payload, profile, pool, now=None):
                 clean['remaining_fraction'] = fraction
             elif number(amount) and amount >= 0:
                 clean['remaining_amount'] = amount
-            reset = reset_epoch(bucket, now)
+            try:
+                reset = reset_epoch(bucket, now)
+            except ValueError:
+                continue
             if reset is not None:
                 clean['reset_at'] = reset
             if clean:
@@ -108,7 +122,7 @@ def atomic_write(path, contents):
             os.unlink(temporary)
 
 
-def read_json(path, limit=MAX_INPUT):
+def read_file(path, limit=MAX_INPUT):
     descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
     try:
         info = os.fstat(descriptor)
@@ -119,7 +133,11 @@ def read_json(path, limit=MAX_INPUT):
         os.close(descriptor)
     if len(raw) > limit:
         raise ValueError('Oversized metadata file')
-    return json.loads(raw)
+    return raw
+
+
+def read_json(path, limit=MAX_INPUT):
+    return json.loads(read_file(path, limit))
 
 
 def store_snapshot(snapshot, directory):
@@ -140,38 +158,70 @@ def store_snapshot(snapshot, directory):
     return path
 
 
+WRAPPER_HEADER = '#!/bin/sh\n# AgentsMonitoring Antigravity quota collector\n'
+
+
+def managed_wrapper(contents, expected_args):
+    """Recognize our narrow generated format; marker/uid are not authentication."""
+    try:
+        source = contents.decode('utf-8')
+        if not source.startswith(WRAPPER_HEADER) or len(source.splitlines()) != 3:
+            return False
+        command = source.splitlines()[2]
+        if not command.startswith('exec '):
+            return False
+        words = shlex.split(command[5:])
+        return (len(words) == 10 and words[1] == '-I' and words[3] == 'collect'
+                and words[4:] == expected_args[4:] and Path(words[0]).is_absolute()
+                and Path(words[2]).is_absolute() and Path(words[2]).name == 'antigravity_usage.py'
+                and Path(words[2]).parent.name == 'agentsmon')
+    except (ValueError, UnicodeError):
+        return False
+
+
 def install(profile_home, profile, pool, directory, apply=False):
     profile_home = Path(profile_home).expanduser().absolute()
     path = profile_home / '.gemini/antigravity-cli/settings.json'
-    previous = read_json(path) if os.path.lexists(path) else {}
+    original = read_file(path) if os.path.lexists(path) else None
+    previous = json.loads(original) if original is not None else {}
     if not isinstance(previous, dict):
         raise ValueError('Invalid settings object')
-    command = shlex.join([sys.executable, '-I', str(Path(__file__).absolute()), 'collect',
-                          '--profile', label(profile), '--pool', label(pool),
-                          '--snapshot-dir', str(Path(directory).expanduser().absolute())])
+    arguments = [sys.executable, '-I', str(Path(__file__).absolute()), 'collect',
+                 '--profile', label(profile), '--pool', label(pool),
+                 '--snapshot-dir', str(Path(directory).expanduser().absolute())]
     wrapper = path.parent / 'agentsmon-statusline.sh'
-    wrapper_contents = ('#!/bin/sh\n# AgentsMonitoring Antigravity quota collector\nexec ' + command + '\n').encode()
+    wrapper_contents = (WRAPPER_HEADER + 'exec ' + shlex.join(arguments) + '\n').encode()
     desired = {'type': 'command', 'command': shlex.quote(str(wrapper)), 'enabled': True, 'stack_with_default': True}
-    if previous.get('statusLine') == desired:
-        if (wrapper.is_file() and not wrapper.is_symlink() and wrapper.stat().st_size <= MAX_INPUT
-                and wrapper.read_bytes() == wrapper_contents):
-            return {'status': 'already-configured', 'command_path': str(wrapper)}
-        raise ValueError('Existing collector wrapper differs; review before replacing')
-    if 'statusLine' in previous:
+    configured = previous.get('statusLine') == desired
+    if 'statusLine' in previous and not configured:
         raise ValueError('Existing statusLine preserved; compose explicitly before installing')
-    if not apply:
-        return {'status': 'ready-to-install', 'changes': ['statusLine'], 'applied': False, 'command_path': str(wrapper)}
-    private_directory(path.parent)
+    old_wrapper = None
     if os.path.lexists(wrapper):
-        raise ValueError('Existing wrapper preserved; review before replacing')
+        info = wrapper.lstat()
+        if info.st_uid != os.getuid() or info.st_mode & 0o022:
+            raise ValueError('Wrapper is not privately managed')
+        old_wrapper = read_file(wrapper)
+        if old_wrapper != wrapper_contents and not (configured and managed_wrapper(old_wrapper, arguments)):
+            raise ValueError('Foreign or changed wrapper preserved; review before replacing')
+    if configured and old_wrapper == wrapper_contents:
+        return {'status': 'already-configured', 'command_path': str(wrapper)}
+    operation = 'upgrade' if configured and old_wrapper is not None else 'recover' if old_wrapper is not None else 'install'
+    if not apply:
+        return {'status': 'ready-to-' + operation, 'changes': ['statusLine', 'managed-wrapper'],
+                'applied': False, 'command_path': str(wrapper)}
+    private_directory(path.parent)
     updated = dict(previous, statusLine=desired)
-    if path.exists():
-        backup = path.with_name('settings.before-agentsmon-' + str(time.time_ns()) + '.json')
-        atomic_write(backup, json.dumps(previous, ensure_ascii=False).encode())
-    atomic_write(wrapper, wrapper_contents)
+    stamp = str(time.time_ns())
+    if original is not None:
+        # Exact bytes preserve formatting, ordering and any unrelated settings.
+        atomic_write(path.with_name('settings.before-agentsmon-' + stamp + '.json'), original)
+    if old_wrapper is not None and old_wrapper != wrapper_contents:
+        atomic_write(wrapper.with_name('agentsmon-statusline.before-agentsmon-' + stamp + '.sh'), old_wrapper)
+    if old_wrapper != wrapper_contents:
+        atomic_write(wrapper, wrapper_contents)
     wrapper.chmod(0o700)
     atomic_write(path, json.dumps(updated, ensure_ascii=False, indent=2).encode())
-    return {'status': 'configured', 'applied': True, 'command_path': str(wrapper)}
+    return {'status': 'configured', 'operation': operation, 'applied': True, 'command_path': str(wrapper)}
 
 
 def main(argv=None):
@@ -195,7 +245,7 @@ def main(argv=None):
         else:
             print(json.dumps(install(args.profile_home, args.profile, args.pool, args.snapshot_dir, args.apply)))
         return 0
-    except (ValueError, OSError, TypeError, KeyError, RuntimeError, RecursionError):
+    except (ValueError, OSError, TypeError, KeyError, RuntimeError, RecursionError, OverflowError):
         if args.command == 'collect':
             # Empty pre-conversation payloads are normal; do not disable native statusLine.
             return 0

@@ -25,7 +25,14 @@ It writes `.gemini/antigravity-cli/settings.json` under the supplied home, adds
 `statusLine.enabled=true` and `stack_with_default=true`, and generates a private
 `agentsmon-statusline.sh` invoking the pinned reviewed collector with a central
 snapshot directory. Existing unrelated statusLine settings or wrappers are refused;
-other settings are preserved and an existing settings file is backed up privately.
+other settings are preserved and an existing settings file is backed up as exact original bytes privately.
+An explicit `--apply` can upgrade ONLY a recognized privately owned generated
+wrapper attached to the same configured statusLine and the same profile/pool/destination.
+The old wrapper is backed up too. Foreign hooks/wrappers remain refused, including
+during dry-run. An identical wrapper left by a partial install can be recovered.
+The collector stays pinned to the reviewed immutable release; retain that release
+until hooks are explicitly upgraded. For rollback restore the backed-up hook/wrapper
+before removing a release. A marker and file owner are local conventions, not authentication.
 The installer starts/reloads nothing and does not read authentication files.
 
 The command prints the wrapper `command_path`; in an already-running idle CLI,
@@ -40,7 +47,8 @@ column selects the reading for each `kind=antigravity` row's exact public
 `session_id` or `conversation_id`. No new per-agent `usage_plugin.sources` mapping
 is required. Registering the first configured Antigravity agent enables the built-in
 Usage adapter; dynamic manager discovery refreshes when that provider is added.
-The agent/session identity itself must already be registered/resolved. Existing
+The agent/session identity itself must already be registered/resolved. An explicit
+`usage_plugin: false` disables automatic discovery too. Existing
 explicit source mappings take precedence. Headless paths that never emit statusLine
 cannot provide this reading; no transcript scan or API fallback is attempted.
 
@@ -58,3 +66,10 @@ explicit profile/pool cannot be overwritten by another configured collector.
 Snapshots are local metadata under the same trusted Unix principal, not an
 authenticated telemetry boundary. A future retention policy is separate; these
 files contain no conversation content and collection creates one per conversation.
+
+A later event with missing, empty or invalid quota deliberately replaces a prior
+reading with No current reading; we do not refresh an older quota as if new. Native
+metadata events may therefore transiently hide a prior quota. Invalid model IDs
+become unknown model metadata while a valid quota remains usable. Reset epochs
+outside0..observation+366days are rejected, including millisecond timestamps.
+All percentages describe quota, not a monetary balance.

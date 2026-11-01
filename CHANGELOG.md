@@ -9,7 +9,10 @@
 - Automatically attach Usage readings to registered Antigravity conversation IDs
   without per-agent source mappings; profile/pool labels remain explicitly configured.
 - Add an explicit profile statusLine installer preserving native UI and refusing
-  existing unrelated hooks. It starts no sessions or services and makes no model calls.
+  existing unrelated hooks. Explicitly upgrade recognized pinned wrappers and recover
+  partial installs while retaining original-byte settings/wrapper backups. Reject
+  oversized numeric/reset metadata and retain quotas when model IDs are invalid.
+  It starts no sessions or services and makes no model calls.
 
 ## 0.4.0.dev5 — 2026-10-31 · Quick links, Czech hints
 

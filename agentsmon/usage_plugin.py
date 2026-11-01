@@ -1,4 +1,4 @@
-"""Opt-in, account-scoped usage column. Inspired by TomasErnest's PR #8.
+"""Account-scoped usage column; registered Antigravity profiles adapt automatically. Inspired by TomasErnest's PR #8.
 
 Read local usage/status-line snapshots only. No OAuth token reads or network
 requests; never infer that all agents from one vendor share an account.
@@ -87,7 +87,7 @@ def antigravity_reading(sid, directory, now):
             disabled = True
             continue
         reset = item.get('reset_at')
-        if reset is not None and (not number(reset) or reset <= now):
+        if reset is not None and (not number(reset) or reset <= now or reset > now + 366 * 86400):
             continue
         fraction = item.get('remaining_fraction')
         amount = item.get('remaining_amount')
@@ -100,11 +100,14 @@ def antigravity_reading(sid, directory, now):
     stale = now - stamp > 600
     if not bars and not amounts:
         return {'text': 'Disabled' if disabled else 'No current reading', 'tone': 'muted',
-                'title': (account + ' · No unexpired quota reading; context tokens are not quota')[:500]}
-    title = account + ' · Antigravity statusLine · ' + datetime.fromtimestamp(stamp).astimezone().isoformat()
+                'title': (account + ' · No unexpired quota reading; quota, not monetary balance; context tokens are not quota')[:500]}
+    title = account + ' · Antigravity statusLine · quota, not monetary balance · ' + datetime.fromtimestamp(stamp).astimezone().isoformat()
     if amounts:
         title += ' · Remaining amount units unspecified; not dollars or verified billed spend'
-    value = {'text': ('Cached · ' if stale else '') + '; '.join(amounts),
+    text = '; '.join(amounts)
+    if stale:
+        text = 'Cached · ' + text if text else 'Cached'
+    value = {'text': text,
              'tone': 'muted' if stale else 'ok', 'title': title[:500]}
     if bars:
         value['bars'] = bars
@@ -133,6 +136,6 @@ def collect(context,settings):
             value = antigravity_reading(sid or conversation, directory, time.time())
         except Exception:
             value = {'text': 'Unavailable', 'tone': 'muted',
-                     'title': 'Antigravity quota unavailable; configure the profile collector and wait for its statusLine event'}
+                     'title': 'Antigravity quota unavailable, not monetary balance; configure the profile collector and wait for its statusLine event'}
         patches.append({'row_id': identity, 'cells': {'limits': value}})
     return {'columns':[{'id':'limits','title':'Usage'}],'patches':patches}

@@ -147,7 +147,7 @@ def discover(cfg):
                     found.append(Plugin(name,'?',{}, {},error='Missing, ambiguous or invalid entry point metadata'))
         except Exception:
             found.append(Plugin('entry-points','?',{}, {},error='Invalid entry point configuration or discovery failed'))
-    antigravity_auto = any(a.get('kind') == 'antigravity' for a in cfg.get('agents', []) if isinstance(a, dict))
+    antigravity_auto = cfg.get('usage_plugin') is not False and any(a.get('kind') == 'antigravity' for a in cfg.get('agents', []) if isinstance(a, dict))
     if cfg.get('usage_plugin') or antigravity_auto:
         try:
             add({'api_version':1,'id':'usage','version':'1.0.0','settings':cfg.get('usage_plugin') or {}},
