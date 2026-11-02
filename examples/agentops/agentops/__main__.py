@@ -98,7 +98,34 @@ def main():
     comparison.add_argument('--baseline', type=Path, required=True)
     comparison.add_argument('--candidate', type=Path, required=True)
     comparison.add_argument('--output', type=Path, required=True)
+    verify = commands.add_parser('verify', help='Read-only result check: exact folder, files and real hashes; returns 2 unless pass')
+    verify.add_argument('--spec', type=Path, required=True)
+    verify.add_argument('--output', type=Path, required=True)
+    verify.add_argument('--task')
+    verify.add_argument('--actor')
+    verify.add_argument('--expected-version', type=int)
+    verify.add_argument('--request-id')
     args = parser.parse_args()
+    if args.command == 'verify':
+        from . import postcheck, regression
+        if bool(args.task) != bool(args.actor):
+            raise ValueError('--task and --actor belong together')
+        spec = regression.read_document(args.spec)
+        postcheck.refuse_own_effects(spec, postcheck.effect_paths(str(args.output.expanduser()), args.db.expanduser() if args.task else None))
+        result = postcheck.run(spec)
+        regression.write_report(args.output, result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if args.task:
+            report = args.output.expanduser().absolute()
+            ledger = Ledger(args.db)
+            try:
+                ledger.record_postcheck(args.task, args.actor, result['verdict'], str(report),
+                                        postcheck.report_digest(report), args.expected_version, args.request_id)
+            finally:
+                ledger.close()
+        if result['verdict'] != 'pass':
+            raise SystemExit(2)
+        return
     if args.command == 'regress':
         from . import regression
         if args.operation == 'template':

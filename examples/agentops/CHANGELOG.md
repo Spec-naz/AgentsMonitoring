@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.5 — 2026-11-02
+
+- Add `agentops verify` (LC-01): a read-only, rule-based check of the exact target folder,
+  files found there and their real SHA-256. Wrong folder, missing or changed file fails;
+  unreadable data or an unresolved effect stays unverified. The report records code version
+  and date, and links to the task; `done` refuses while the latest check is not a pass.
+
 ## 0.2.4 — 2026-11-01
 
 - Add offline synthetic regression template/run/compare commands with full suite
