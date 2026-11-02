@@ -116,6 +116,12 @@ The optional [Task workers plugin](docs/worker-monitoring.md) shows explicitly
 registered workers independently of persistent sessions and the task snapshot.
 It makes no model/auth calls and never starts or restarts a worker.
 
+### Result check on the real location
+
+`agentops verify --spec S --output R [--task ID --actor A]` checks the exact folder, the files
+found there and their real hashes, using rules only. It does not check application health. See
+[LC-01 result check](docs/postconditions.md).
+
 ### Offline regression cases
 
 `agentops regress template/run/compare` evaluates explicit synthetic observations and

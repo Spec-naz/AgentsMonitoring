@@ -162,6 +162,9 @@ class Ledger:
                 elif action == 'done' and task['state'] == 'review' and artifact:
                     if not task['producer'] or task['producer'] == who:
                         raise Conflict('Completion requires an independent reviewer')
+                    latest = self.latest_postcheck(task_id)
+                    if latest and latest['verdict'] != 'pass':
+                        raise Conflict('Latest postcheck is %s; run a new check before completion' % latest['verdict'])
                     changes.update(state='done', artifact=artifact)
                 elif action == 'cancel' and task['state'] not in ('done', 'cancelled') and note:
                     changes.update(state='cancelled', target=None, purpose=None)
@@ -172,6 +175,37 @@ class Ledger:
             self._event(task_id, who, action, {'from_state': task['state'], 'to_state': changes.get('state', task['state']),
                                              'changes': changes, **{k: v for k, v in payload.items() if v is not None}})
             return self.get(task_id)
+        return self._command(payload, request_id, work)
+
+    def latest_postcheck(self, task_id):
+        """The newest recorded result check of this task, or None. Tasks without a check are not affected."""
+        row = self.db.execute("SELECT seq,at,actor,details FROM events WHERE task_id=? AND action='postcheck' "
+                              'ORDER BY seq DESC LIMIT 1', (task_id,)).fetchone()
+        if not row:
+            return None
+        details = json.loads(row['details'])
+        return {'seq': row['seq'], 'at': row['at'], 'actor': row['actor'], 'verdict': details['verdict'],
+                'report': details['report'], 'report_sha256': details['report_sha256']}
+
+    def record_postcheck(self, task_id, who, verdict, report, report_sha256, expected=None, request_id=None):
+        """Link a saved report to the task. Changes no state; only `done` reads the latest verdict."""
+        who, report = actor(who), label(report, 500)
+        if verdict not in ('pass', 'fail', 'unverified'):
+            raise ValueError('Invalid postcheck verdict')
+        payload = dict(op='postcheck', id=task_id, who=who, verdict=verdict, report=report,
+                       report_sha256=report_sha256, expected=expected)
+        def work():
+            task = self.get(task_id)
+            if expected is not None and expected != task['version']:
+                raise Conflict('Task changed; refresh before retrying')
+            if task['owner'] != who:
+                raise Conflict('Only the current owner may change this task')
+            if task['state'] not in ('running', 'review', 'blocked'):
+                raise Conflict('Invalid transition or required evidence missing')
+            now = time.time()
+            self.db.execute('UPDATE tasks SET updated=?,version=? WHERE id=?', (now, task['version'] + 1, task_id))
+            self._event(task_id, who, 'postcheck', {'verdict': verdict, 'report': report, 'report_sha256': report_sha256})
+            return {**self.get(task_id), 'postcheck': self.latest_postcheck(task_id)}
         return self._command(payload, request_id, work)
 
     def cost(self, task_id, who, micros, currency, kind, source, request_id=None):
