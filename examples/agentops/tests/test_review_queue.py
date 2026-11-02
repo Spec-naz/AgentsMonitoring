@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 
 from agentops.ledger import Conflict, Ledger
 from agentops.observe import snapshot
@@ -321,7 +322,7 @@ class Dashboard(Base):
         rows = self.rows()
         main = rows['q-' + task]
         self.assertEqual((main['status'], main['label']), ('Oprava po kontrole', 'autor'))
-        self.assertEqual(main['session_id'], 'agentops history ' + task)
+        self.assertEqual(main['session_id'], 'agentops timeline ' + task)
         evidence = rows[f'q-{task}-0']
         self.assertIn('nalezy.md', evidence['name'])  # visible without hover
         self.assertEqual(evidence['session_id'], '/slozka/nalezy.md')  # the copy field holds all of it
@@ -388,6 +389,30 @@ class Dashboard(Base):
         self.assertEqual(shown['type'], 'workflow')
         self.assertEqual(len(shown['headers']), 5)
         self.assertLessEqual(len(shown['summary']), 120)
+
+    def add_run(self, task, **change):
+        self.ledger.record_run_event({'task_id': task, 'run_id': str(uuid.uuid4()), 'parent_id': None, 'at': 5.0, 'source': 'operator', 'evidence': 'declared',
+                                      'actor': 'autor', 'action': 'start', 'outcome': 'ok', 'error_code': None, 'usage_tokens': 1, **change})
+
+    def test_runs_appear_as_evidence_with_the_timeline_to_copy(self):
+        task = self.returned()
+        self.add_run(task)
+        self.add_run(task, outcome='unknown', usage_tokens=None)
+        rows = self.rows()
+        row = next(row for key, row in rows.items() if 'Běhy: 2' in row['name'])
+        self.assertIn('nejasné: 1', row['name'])
+        self.assertIn('spotřeba neznámá u 1', row['name'])
+        self.assertEqual(row['session_id'], 'agentops timeline ' + task)
+        self.assertEqual(row['kind'], 'workflow-evidence')
+        self.assertEqual(rows['q-' + task]['kind'], 'workflow-attention')
+
+    def test_clean_runs_need_no_attention_and_no_runs_add_no_row(self):
+        task = self.returned()
+        self.assertFalse(any('Běhy' in row['name'] for row in self.rows().values()))
+        self.add_run(task)
+        rows = self.rows()
+        self.assertEqual(rows['q-' + task]['kind'], 'workflow-task')
+        self.assertEqual(next(row for row in rows.values() if 'Běhy' in row['name'])['name'], '↳ Běhy: 1')
 
     def test_note_says_files_cannot_be_opened_from_here(self):
         self.returned()

@@ -138,7 +138,7 @@ RECORDS = {
         'micros': (_count, 'Sum of recorded entries only.'),
         'records': (_count, 'How many entries; everything else is unknown, not zero.'),
     },
-    # Contract for the future LC-02 timeline. Nothing writes these yet.
+    # One step of a concrete run. Written by `agentops run-event`, shown by `agentops timeline`.
     'run_event': {
         'task_id': (_is_uuid, 'The declared task. A task is not a run.'),
         'run_id': (_is_uuid, 'One concrete execution.'),
@@ -245,6 +245,9 @@ def build_export(ledger_path, signals_dir=DEFAULT_SIGNAL_DIR, include_references
         events = [dict(row) for row in connection.execute('SELECT seq,task_id,at,actor,action,details FROM events ORDER BY seq')]
         costs = [dict(row) for row in connection.execute(
             'SELECT currency,kind,SUM(micros) AS micros,COUNT(*) AS records FROM costs GROUP BY currency,kind')]
+        has_runs = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='run_events'").fetchone() is not None
+        runs = [dict(row) for row in connection.execute(
+            'SELECT task_id,run_id,parent_id,at,source,evidence,actor,action,outcome,error_code,usage_tokens FROM run_events ORDER BY seq')] if has_runs else []
     except sqlite3.Error:
         raise ValueError('Ledger cannot be read') from None
     finally:
@@ -270,12 +273,13 @@ def build_export(ledger_path, signals_dir=DEFAULT_SIGNAL_DIR, include_references
         record, lost = _session(snapshot)
         sessions.append(record)
         dropped += lost
+    out_runs = [validate_record('run_event', row) for row in runs]
     out_costs = [validate_record('export_cost', {key: row[key] for key in RECORDS['export_cost']}) for row in costs]
     return {'schema': EXPORT_SCHEMA, 'generated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(now)),
             'agentops_version': __version__, 'references_included': include_references, 'sampling': SAMPLING,
-            'counts': {'tasks': len(out_tasks), 'events': len(out_events), 'sessions': len(sessions),
+            'counts': {'tasks': len(out_tasks), 'events': len(out_events), 'runs': len(out_runs), 'sessions': len(sessions),
                        'dropped_values': dropped, 'withheld_references': withheld},
-            'tasks': out_tasks, 'events': out_events, 'sessions': sessions, 'recorded_costs': out_costs,
+            'tasks': out_tasks, 'events': out_events, 'runs': out_runs, 'sessions': sessions, 'recorded_costs': out_costs,
             'not_included': ['task titles', 'notes and block reasons', 'cost sources', 'session ids', 'prompts and responses',
                              'terminal content', 'credentials', 'error text'],
             'limits': ['Allowlist of formats, not recognition of sensitive data.',

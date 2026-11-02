@@ -111,6 +111,20 @@ def main():
     applied.add_argument('--signals-dir', type=Path, required=True)
     applied.add_argument('--plan-sha256', required=True)
     applied.add_argument('--output', type=Path, required=True)
+    timeline = commands.add_parser('timeline', help='Read-only history of one task: who, when, on what evidence, and problems on record')
+    timeline.add_argument('id')
+    run_event = commands.add_parser('run-event', help='Record one step of a concrete run; no prompts, responses or error text')
+    run_event.add_argument('id')
+    run_event.add_argument('--run-id', help='Omit to start a new run')
+    run_event.add_argument('--parent-id')
+    run_event.add_argument('--actor', required=True)
+    run_event.add_argument('--action', required=True)
+    run_event.add_argument('--source', required=True, choices=('agentops', 'provider-hook', 'operator'))
+    run_event.add_argument('--evidence', required=True, choices=('declared', 'observed'))
+    run_event.add_argument('--outcome', default='unknown', choices=('ok', 'failed', 'unknown'))
+    run_event.add_argument('--error-code')
+    run_event.add_argument('--usage-tokens', type=int)
+    run_event.add_argument('--request-id')
     package = commands.add_parser('package', help='Versioned work packages; builds and checks files, runs nothing')
     package_steps = package.add_subparsers(dest='step', required=True)
     built = package_steps.add_parser('build', help='Add real hashes and sizes to a draft; never overwrites')
@@ -165,6 +179,30 @@ def main():
             raise ValueError('A file for this command could not be read or written') from None
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return
+    if args.command in ('timeline', 'run-event'):
+        import time
+        import uuid
+        try:
+            if args.command == 'timeline':
+                from . import timeline as history
+                try:
+                    config = json.loads(args.config.read_text()) if args.config.exists() else {}
+                except (OSError, ValueError):
+                    config = {}  # the timeline stands without it; a signal then reads as not assigned
+                print(json.dumps(history.build(args.db, args.id, config), ensure_ascii=False, indent=2))
+                return
+            ledger = Ledger(args.db)
+            try:
+                result = ledger.record_run_event({
+                    'task_id': args.id, 'run_id': args.run_id or str(uuid.uuid4()), 'parent_id': args.parent_id, 'at': time.time(), 'source': args.source,
+                    'evidence': args.evidence, 'actor': args.actor, 'action': args.action, 'outcome': args.outcome, 'error_code': args.error_code,
+                    'usage_tokens': args.usage_tokens}, args.request_id, generated=('at',) if args.run_id else ('at', 'run_id'))
+            finally:
+                ledger.close()
+            print(json.dumps(result, indent=2))
+            return
+        except (OSError, sqlite3.Error):  # a path can hold anything, so no raw file error reaches the output
+            raise ValueError('A file for this command could not be read or written') from None
     if args.command == 'package':
         from . import regression, work_package as wp
         try:
