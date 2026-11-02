@@ -1,0 +1,8 @@
+{
+  "api_version": 1,
+  "id": "task-workers",
+  "version": "0.2.3",
+  "module": "plugin.py",
+  "timeout_seconds": 2,
+  "settings": {"workers": []}
+}

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "suite_sha256": "44380aa13041cfc9b0fba009c54b52da7a336ba4b4af15fc674a6a3b4c8ac9a1",
+  "observations": [
+    {
+      "case_id": "backup-folder",
+      "observation": {
+        "destination": "synthetic:backup-target",
+        "content_matches": true,
+        "evidence_ref": "synthetic:readback"
+      }
+    },
+    {
+      "case_id": "restored-app",
+      "observation": {
+        "data_readable": true,
+        "app_healthy": true,
+        "evidence_ref": "synthetic:healthcheck"
+      }
+    },
+    {
+      "case_id": "timeout-unknown",
+      "observation": {
+        "target_state": "unknown",
+        "observed_action": "stop_reconcile",
+        "writes_after_timeout": 0,
+        "operation_id": "synthetic-op-001",
+        "evidence_ref": "synthetic:target-ledger"
+      }
+    }
+  ]
+}
