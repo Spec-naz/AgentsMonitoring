@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  agentops-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify pinned age tools for ephemeral encryption fixtures
+        run: |
+          AGE_TOOLS_ROOT="$RUNNER_TEMP/agentops-age"
+          mkdir -p "$AGE_TOOLS_ROOT"
+          curl -fsSLo "$AGE_TOOLS_ROOT/age.tar.gz" https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          printf '%s  %s\n' cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10 "$AGE_TOOLS_ROOT/age.tar.gz" | sha256sum -c -
+          tar -xzf "$AGE_TOOLS_ROOT/age.tar.gz" -C "$AGE_TOOLS_ROOT" age/age age/age-keygen
+          echo "AGENTOPS_TEST_AGE=$AGE_TOOLS_ROOT/age/age" >> "$GITHUB_ENV"
+          echo "AGENTOPS_TEST_AGE_KEYGEN=$AGE_TOOLS_ROOT/age/age-keygen" >> "$GITHUB_ENV"
+      - name: Verify standalone operational reference
+        working-directory: examples/agentops
+        run: |
+          python -m unittest discover -s tests -v
+          python -m pip install --quiet pyflakes
+          python -m pyflakes agentops monitor tests
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -49,6 +72,9 @@ jobs:
           python tests/verify_czech_hints_browser.py --out browser-evidence/hints
           python tests/verify_antigravity_usage_browser.py --out browser-evidence/antigravity
           python tests/verify_plan_limits_browser.py --out browser-evidence/plan-limits
+          python examples/agentops/tests/verify_monitor_browser.py --agentsmon . --out browser-evidence/agentops
+          CHROME_PATH="$(python -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')"
+          python examples/agentops/tests/verify_queue_browser.py . "$CHROME_PATH" browser-evidence/queue
       - uses: actions/upload-artifact@v4
         if: always()
         with:
