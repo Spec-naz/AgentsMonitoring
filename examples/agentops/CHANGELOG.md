@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.9 — 2026-11-02
+
+- Add `agentops brief` (LC-08): a read-only, rule-based preparation of one task's start, with a linked output check and a defined
+  ending for agent, person, nobody or unknown. It runs and changes nothing. Retain the independently accepted metadata/retention controls from 0.2.7 and work packages from 0.2.8.
+
 ## 0.2.8 — 2026-11-02
 
 - Add versioned work packages (LC-04): `agentops package build/check/render/compare`. A package names the goal, the needed

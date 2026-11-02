@@ -126,6 +126,12 @@ def main():
     compared.add_argument('file', type=Path)
     compared.add_argument('--broad', type=Path, nargs='+', required=True)
     compared.add_argument('--facts', type=Path)
+
+    brief = commands.add_parser('brief', help='Prepare the start of one task; reads only, exit 0/10/20/30 says who continues')
+    brief.add_argument('id')
+    brief.add_argument('--for', dest='for_actor', required=True)
+    brief.add_argument('--guard-db', type=Path)
+    brief.add_argument('--owner-actor', default='michal')
     queue = commands.add_parser('queue', help='Read-only list of what waits for a decision, repair, review or takeover')
     queue.add_argument('--owner-actor', default='michal')
     queue.add_argument('--for', dest='waiting_on')
@@ -182,6 +188,12 @@ def main():
         if not result['ready']:
             raise SystemExit(2)
         return
+
+    if args.command == 'brief':
+        from . import brief as routine
+        result = routine.prepare(args.db, args.id, args.for_actor, args.guard_db or routine.DEFAULT_GUARD, args.owner_actor)
+        print(routine.stable_json(result))
+        raise SystemExit(routine.EXIT[result['ending']])
     if args.command == 'verify':
         from . import postcheck, regression
         if bool(args.task) != bool(args.actor):
