@@ -132,6 +132,11 @@ new questions. `decision_owner` in the config sets that actor; it is a label, no
 The dashboard shows the same list. Evidence appears as visible rows on desktop and phone, and the full reference
 can be copied from Connection details. Local files cannot be opened from the dashboard, by design.
 
+### Metadata and retention
+
+`agentops metadata-export` writes allowlisted metadata only, and `agentops retention plan` reports what could expire
+and deletes nothing. See [metadata policy](docs/metadata-policy.md).
+
 ### Offline regression cases
 
 `agentops regress template/run/compare` evaluates explicit synthetic observations and

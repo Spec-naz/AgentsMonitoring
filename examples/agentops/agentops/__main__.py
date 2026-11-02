@@ -98,6 +98,18 @@ def main():
     comparison.add_argument('--baseline', type=Path, required=True)
     comparison.add_argument('--candidate', type=Path, required=True)
     comparison.add_argument('--output', type=Path, required=True)
+    metadata = commands.add_parser('metadata-export', help='Allowlisted metadata only; no titles, notes, prompts or error text')
+    metadata.add_argument('--output', type=Path, required=True)
+    metadata.add_argument('--signals-dir', type=Path)
+    metadata.add_argument('--include-references', action='store_true', help='Add local paths of results and reports')
+    retention = commands.add_parser('retention', help='Plan by default; deletes nothing without an explicit apply')
+    stages = retention.add_subparsers(dest='stage', required=True)
+    planned = stages.add_parser('plan')
+    planned.add_argument('--signals-dir', type=Path)
+    applied = stages.add_parser('apply', help='Only an explicit non-production folder, only a reviewed plan')
+    applied.add_argument('--signals-dir', type=Path, required=True)
+    applied.add_argument('--plan-sha256', required=True)
+    applied.add_argument('--output', type=Path, required=True)
     queue = commands.add_parser('queue', help='Read-only list of what waits for a decision, repair, review or takeover')
     queue.add_argument('--owner-actor', default='michal')
     queue.add_argument('--for', dest='waiting_on')
@@ -109,6 +121,28 @@ def main():
     verify.add_argument('--expected-version', type=int)
     verify.add_argument('--request-id')
     args = parser.parse_args()
+    if args.command in ('metadata-export', 'retention'):
+        from . import metadata as policy
+        from .regression import write_report
+        signals = args.signals_dir or policy.DEFAULT_SIGNAL_DIR
+        try:
+            if args.command == 'metadata-export':
+                result = policy.build_export(args.db, signals, args.include_references)
+                write_report(args.output, result)
+                print(json.dumps(result['counts'], indent=2))
+                return
+            try:
+                config = json.loads(args.config.read_text()) if args.config.exists() else {}
+            except (OSError, ValueError):
+                raise ValueError('Configuration cannot be read') from None
+            if args.stage == 'plan':
+                result = policy.plan(config, signals, args.db)
+            else:
+                result = policy.apply_plan(config, signals, args.plan_sha256, args.output)
+        except OSError:  # paths can hold anything, so these commands never print raw file errors
+            raise ValueError('A file for this command could not be read or written') from None
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
     if args.command == 'verify':
         from . import postcheck, regression
         if bool(args.task) != bool(args.actor):
