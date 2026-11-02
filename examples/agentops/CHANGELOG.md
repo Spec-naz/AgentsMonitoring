@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.8 — 2026-11-02
+
+- Add versioned work packages (LC-04): `agentops package build/check/render/compare`. A package names the goal, the needed
+  sources with origin and hash, constraints, the financial frame, owner and reviewer, output and end condition.
+  A missing or changed required source means not ready. It runs nothing and holds no task state.
+  Retain the independently accepted metadata export, retention safeguards and provider filters from 0.2.7.
+
 ## 0.2.7 — 2026-11-02
 
 - Add allowlists per record type with documented purposes, including the contract of a future

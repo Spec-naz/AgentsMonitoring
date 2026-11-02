@@ -137,6 +137,11 @@ can be copied from Connection details. Local files cannot be opened from the das
 `agentops metadata-export` writes allowlisted metadata only, and `agentops retention plan` reports what could expire
 and deletes nothing. See [metadata policy](docs/metadata-policy.md).
 
+### Work packages
+
+`agentops package` builds and checks a small file that gives one worker what the task needs, instead of the whole team
+history. See [work packages](docs/work-packages.md).
+
 ### Offline regression cases
 
 `agentops regress template/run/compare` evaluates explicit synthetic observations and
