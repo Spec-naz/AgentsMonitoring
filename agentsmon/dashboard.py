@@ -369,6 +369,8 @@ function renderActions(a,table){
 const previousAgentSignals=new WeakMap();
 function renderAgents(root, agents, summary=null, columns=[]){
   renderColumns(root, columns);
+  // Declared workflow tables say nothing about agent health: no healthy count, no green or red.
+  const workflow=summary&&summary.presentation&&summary.presentation.type==="workflow"?summary.presentation:null;
   const priorSignals=previousAgentSignals.get(root)||new Map(), nextSignals=new Map();
   previousAgentSignals.set(root,nextSignals);
   const tb=q(root,".agent-rows");
@@ -386,6 +388,17 @@ function renderAgents(root, agents, summary=null, columns=[]){
     cnt.textContent=`${running}/${agents.length} healthy`;
     cnt.className="agents-count ml-auto text-sm font-medium "+state[2];
     q(root,".agents-note").textContent=summary.error||summary.note||"";
+  }
+  if(workflow){
+    const attention=agents.some(a=>a.kind==="workflow-attention");
+    root.dataset.rowCount=workflow.count;
+    q(root,"thead tr").querySelectorAll("th span").forEach((th,i)=>{ if(workflow.headers[i]) th.textContent=workflow.headers[i]; });
+    cnt.textContent=workflow.summary;  // an error keeps its red head and note, never a healthy count
+    if(!summary.error){
+      q(root,".svc-head").className="svc-head flex items-center gap-2.5 mb-3 rounded-lg border px-3 py-2 cursor-pointer "+STATE.nodata[3];
+      q(root,".svc-dot").className="svc-dot h-3 w-3 rounded-full shrink-0 "+(attention?"bg-amber-500":"bg-slate-300");
+      cnt.className="agents-count ml-auto text-sm font-medium "+(attention?"text-amber-600":"text-slate-400");
+    }
   }
   if(!agents.length){tb.innerHTML=`<tr><td colspan="${6+columns.length}" class="px-3 py-3 text-slate-400">${esc(summary?(summary.error||"No agents found."):"No tmux sessions found.")}</td></tr>`;applyFilter(root);return;}
   const openDetails=new Set([...tb.querySelectorAll("tr[data-agent] details[open]")].map(el=>el.closest("tr").dataset.agent));
@@ -408,16 +421,18 @@ function renderAgents(root, agents, summary=null, columns=[]){
     }else{
       sid=`<span class="text-xs text-slate-300 cursor-help" data-hint="— none">— none</span>`;
     }
-    const ok=a.alive&&!a.needs_login; const dot=a.needs_login?"bg-amber-500":(ok?"bg-emerald-500":(a.plugin?"bg-rose-500":"bg-slate-300"));
+    const ok=a.alive&&!a.needs_login;
+    const workflowDot={"workflow-attention":"bg-amber-500","workflow-evidence":"bg-slate-200"}[a.kind]||"bg-slate-400";
+    const dot=workflow?workflowDot:a.needs_login?"bg-amber-500":(ok?"bg-emerald-500":(a.plugin?"bg-rose-500":"bg-slate-300"));
     // Health is the visible status for every agent; latency is supplementary detail.
     const fallbackStatus=a.needs_login?"Login required":a.plugin?(ok?"Available":"Unavailable"):
       a.kind==="daemon"&&a.health_url?(ok?"Endpoint responding":"Endpoint unavailable"):(ok?"Process running":"Process stopped");
     const statusTxt=(!a.plugin&&a.status==="Running"?fallbackStatus:a.status)||fallbackStatus;
     const statusTip=[a.status_detail||a.status,
       ok&&a.latency_ms!=null?`latency ${fmtLat(a.latency_ms)}`:""].filter(Boolean).join(" · ");
-    const stCls=a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
+    const stCls=workflow?(a.kind==="workflow-attention"?"text-amber-600":a.kind==="workflow-evidence"?"text-slate-400":"text-slate-600"):a.needs_login?"text-amber-600":(ok?"text-slate-600":"text-slate-400");
     const tr=document.createElement("tr"); tr.dataset.agent=a.id||a.name; tr.className="border-b border-slate-100 last:border-0";
-    tr.dataset.state=a.needs_login?"login":ok?"ok":"down";
+    tr.dataset.state=workflow?(a.kind||"workflow-task"):a.needs_login?"login":ok?"ok":"down";
     tr.dataset.search=[a.name,a.label,statusTxt,a.telegram_bot,a.account].filter(Boolean).join(" ").toLowerCase();
     const signalKey=tr.dataset.agent;
     const signal=JSON.stringify([a.alive,a.needs_login,a.status]);
@@ -429,7 +444,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
     // tmux. For a tmux agent, clicking its name copies the attach command (toast feedback so the
     // column width never jumps).
     const attachCmd=`tmux attach -t "${a.tmux_session||a.name}"`;
-    const nameCell=(a.kind!=="daemon")
+    const nameCell=(a.kind!=="daemon"&&!workflow)
       ? `<button type="button" class="agent-name cursor-pointer hover:text-sky-600" data-copy="${esc(attachCmd)}" title="${esc(attachCmd)} (click to copy)">${nameInner}</button>`
       : nameInner;
     // Telegram deep-link icon for agents bridged to a bot (opens t.me/<bot> in a new tab).
@@ -438,7 +453,7 @@ function renderAgents(root, agents, summary=null, columns=[]){
     tr.innerHTML=
       `<td class="px-2 py-1.5 font-medium text-slate-700 whitespace-nowrap"><div class="agent-identity"><span class="agent-avatar" aria-hidden="true">${esc((a.name||"?").slice(0,1).toUpperCase())}</span><div class="agent-title">${nameCell}${recovery}</div>${tg}</div></td>`+
       `<td data-label="Model" class="px-2 py-1.5 whitespace-nowrap"><span title="${esc(a.account?'Account: '+a.account:a.label)}" data-hint="${esc(a.label)}" class="inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${tcls}">${esc(a.label)}</span>${a.metadata_error?'<br><span class="text-[11px] text-amber-600" data-hint="incomplete data">Incomplete data</span>':""}</td>`+
-      `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary data-hint="connection details">Connection details</summary>${sid}</details></td>`+
+      `<td data-label="Session / port" class="px-2 py-1.5"><details class="session-detail"><summary${workflow?'':' data-hint="connection details"'}>${esc(workflow?workflow.details_label:"Connection details")}</summary>${sid}</details></td>`+
       `<td data-label="Session age" class="px-2 py-1.5 text-slate-500 text-xs whitespace-nowrap" title="${esc(a.status_detail||'')}">${a.age!=null?"ago "+fmtDuration(a.age):'<span data-hint="–">–</span>'}</td>`+
       `<td data-label="Reported status" class="px-2 py-1.5" title="${esc(statusTip)}"><span class="inline-flex items-center gap-1.5 whitespace-nowrap ${stCls}"><span class="h-2 w-2 rounded-full ${dot} shrink-0"></span><span class="flex flex-col" data-hint="${esc(statusTxt)}">${esc(statusTxt)}</span></span></td>`+
       columns.map(c=>`<td data-label="${esc(c.title||c.id)}" class="px-2 py-1.5 text-xs">${renderCell((a.cells||{})[c.id])}</td>`).join("")+
@@ -461,7 +476,7 @@ function applyFilter(root){
   tools.hidden=rows.length<FILTER_FROM&&!term;
   let shown=0;
   rows.forEach(tr=>{const hit=!term||(tr.dataset.search||"").includes(term); tr.hidden=!hit; if(hit)shown++;});
-  q(root,".roster-count").textContent=term?`${shown} of ${rows.length} shown`:`${rows.length} agents`;
+  q(root,".roster-count").textContent=term?`${shown} of ${rows.length} shown`:(root.dataset.rowCount||`${rows.length} agents`);
 }
 document.addEventListener("input",e=>{ if(e.target.matches(".roster-filter")) applyFilter(e.target.closest("section")); });
 // Collapsible blocks. The first OPEN_BY_DEFAULT blocks (agents table + the first service cards)

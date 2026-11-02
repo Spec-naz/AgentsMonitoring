@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0.dev8 — 2026-11-02 · Workflow tables are not agent health
+
+- A plugin table may declare an optional `presentation` of type `workflow`. Such a table shows its own task count
+  and labels, without a healthy count or green and red health colours. Rows use the existing `kind` field:
+  `workflow-task`, `workflow-attention` or `workflow-evidence`. They offer no tmux attach.
+- Tables without `presentation` render exactly as before. An older plugin keeps working.
+
 ## 0.4.0.dev7 — 2026-11-01 · Reviewed plan limits panel
 
 - Render only built-in Usage quotas, preserve explicit Antigravity pool labels and stale prefixes; identical percentages never infer shared accounts. Deduplicate only an exact operator-declared source identity with identical freshness/values. Source grouping hashes do not expose local paths and do not prove account authentication.

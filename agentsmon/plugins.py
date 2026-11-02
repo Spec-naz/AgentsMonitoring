@@ -211,6 +211,17 @@ def invoke(plugin, method, context):
         proc.stdin.close();proc.stdout.close()
 
 
+def presentation(value):
+    """Optional labels for a table of declared workflow, not agent health. Absent keeps an ordinary table."""
+    if value is None: return None
+    if not isinstance(value,dict) or set(value)-{'type','count','summary','details_label','headers'}: raise ValueError('Invalid presentation')
+    if value.get('type')!='workflow': raise ValueError('Invalid presentation')
+    headers=value.get('headers',[])
+    if not isinstance(headers,list) or len(headers)!=5: raise ValueError('Invalid presentation')
+    return {'type':'workflow','count':text(value['count'],80),'summary':text(value['summary'],120),
+            'details_label':text(value['details_label'],40),'headers':[text(h,40) for h in headers]}
+
+
 def validate_result(plugin, value):
     if not isinstance(value,dict) or set(value)-{'tables','patches','columns','hidden_sessions','hidden_services'}: raise ValueError('Invalid result')
     tables=[]; seen=set(); columns=[]; patches=[]
@@ -225,9 +236,12 @@ def validate_result(plugin, value):
         error=text(t.get('error',''))
         up=t.get('up',True)
         if type(up) is not bool: raise ValueError('Invalid table health')
-        tables.append({'id':plugin.id+':'+tid,'title':text(t['title'],100),'rows':rows,
-                       'note':text(t.get('note','')),'up':up and not error and all(r['alive'] for r in rows),
-                       'error':error})
+        table={'id':plugin.id+':'+tid,'title':text(t['title'],100),'rows':rows,
+               'note':text(t.get('note','')),'up':up and not error and all(r['alive'] for r in rows),
+               'error':error}
+        shown=presentation(t.get('presentation'))
+        if shown: table['presentation']=shown
+        tables.append(table)
     for p in objects(value.get('patches',[])):
         if set(p)-{'row_id','label','vendor','account','cells','name_color'}: raise ValueError('Invalid patch')
         update={'row_id':text(p['row_id'],240)}

@@ -133,6 +133,10 @@ section[data-svc] .agent-rows td:has(details[open]){grid-column:1/-1;order:7;pad
 tr[data-state=ok] .agent-avatar{box-shadow:inset 0 0 0 2px var(--good),var(--glow) color-mix(in srgb,var(--good) 35%,transparent)}
 tr[data-state=login] .agent-avatar{box-shadow:inset 0 0 0 2px var(--warn),var(--glow) color-mix(in srgb,var(--warn) 35%,transparent)}
 tr[data-state=down] .agent-avatar{box-shadow:inset 0 0 0 2px var(--bad);color:var(--muted)}
+tr[data-state=workflow-attention] .agent-avatar{box-shadow:inset 0 0 0 2px var(--warn)}
+tr[data-state=workflow-task] .agent-avatar{box-shadow:inset 0 0 0 2px var(--line-hi)}
+tr[data-state=workflow-evidence] .agent-avatar{opacity:.55}
+tr[data-state=workflow-evidence] .agent-title{color:var(--muted)}
 .agent-title{flex:1;min-width:0;line-height:1.3}
 .agent-name{font:600 14px/1.3 var(--sans);text-align:left;white-space:normal;overflow-wrap:anywhere;max-width:100%;color:var(--ink)}
 .agent-title br+span{font-size:11.5px}
