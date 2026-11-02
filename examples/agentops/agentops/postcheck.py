@@ -8,7 +8,6 @@ replacement during the check; a change right after it stays possible, so a resul
 """
 import errno
 import hashlib
-import json
 import os
 from pathlib import Path
 import stat
