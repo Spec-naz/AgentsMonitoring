@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.7 — 2026-11-02
+
+- Add allowlists per record type with documented purposes, including the contract of a future
+  task/run/parent event (LC-07). Unknown fields, nested objects and free text are refused.
+- Add `agentops metadata-export`: no titles, notes, prompts, cost sources, session ids or error text.
+  Local paths appear only with `--include-references`, and every audit event is exported.
+- Add `agentops retention plan`, which deletes nothing, and a staging-only `apply` bound to a plan hash.
+  The ledger and reports never expire. Production pruning is not enabled.
+- A stored session snapshot now keeps only allowlisted fields when read, so a foreign value is not
+  carried on by the next write. `prune` no longer deletes malformed or foreign files.
+
 ## 0.2.6 — 2026-11-02
 
 - Add `agentops queue` and a dashboard table (LC-03): one read-only list of owner decisions,

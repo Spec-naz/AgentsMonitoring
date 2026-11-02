@@ -66,7 +66,7 @@ ps.ingest(provider, raw_bytes, state_dir=..., now=None, actor=None) -> snapshot 
 ps.read_sessions(state_dir=..., provider=None) -> [snapshot]
 ps.classify(snapshot, now=None, limits=None) -> signal
 ps.agent_signal(agent, provider, state_dir=..., now=None, session_id=None, limits=None) -> signal
-ps.prune(state_dir=..., now=None, max_age=14 days) -> int
+ps.prune(state_dir=..., now=None, max_age=14 days) -> int  # expired valid sessions only; nothing in production calls it
 ps.plan_install(provider, config_path=None, command=None, include_activity=False) -> (merged_config, plan)
 ps.hook_command(provider, python='/usr/bin/python3', package_root=None, state_dir=None) -> str
 ```

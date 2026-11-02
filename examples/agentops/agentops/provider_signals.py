@@ -23,6 +23,7 @@ import errno
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -79,6 +80,46 @@ class Rejected(Exception):
     def __init__(self, reason):
         super().__init__(reason)
         self.reason = reason
+
+
+def _number(value):
+    return type(value) in (int, float) and math.isfinite(value) and value >= 0
+
+
+def _time_or_none(value):
+    return value is None or _number(value)
+
+
+TURNS = ('unknown', 'idle', 'running', 'failed', 'ended')
+# Every field a session snapshot may hold. A file on disk may have been written by something else, so
+# reading it keeps only these: an extra field or a free-text value must not be carried on by the next write.
+SNAPSHOT_FIELDS = {
+    'schema_version': lambda value: value == SCHEMA_VERSION and type(value) is int,
+    'provider': lambda value: value in PROVIDERS,
+    'session_id': lambda value: isinstance(value, str) and SESSION_RE.fullmatch(value) is not None,
+    'actor': lambda value: value is None or (isinstance(value, str) and ACTOR_RE.fullmatch(value) is not None),
+    'first_seen_at': _time_or_none,
+    'turn': lambda value: value in TURNS,
+    'turn_since': _time_or_none,
+    'waiting_since': _time_or_none,
+    'waiting_kind': lambda value: value in ('confirmed', 'probable'),
+    'ended_at': _time_or_none,
+    'last_event': lambda value: value is None or (isinstance(value, str) and any(value in events for events in PROVIDERS.values())),
+    'last_event_at': _time_or_none,
+    'events': lambda value: type(value) is int and value >= 0,
+}
+
+
+def clean_snapshot(value):
+    """The allowlisted part of a stored snapshot, or None when it cannot identify a session."""
+    if not isinstance(value, dict):
+        return None
+    cleaned = {}
+    for key, valid in SNAPSHOT_FIELDS.items():
+        if key in value and not isinstance(value[key], (dict, list)) and valid(value[key]):
+            cleaned[key] = value[key]
+    required = ('schema_version', 'provider', 'session_id')
+    return cleaned if all(key in cleaned for key in required) else None
 
 
 def _private_dir(path):
@@ -225,8 +266,8 @@ def ingest(provider, raw, state_dir=DEFAULT_STATE_DIR, now=None, actor=None):
     path = _session_file(root, provider, meta['session_id'])
     with _Lock(folder / '.lock'):
         try:
-            current = json.loads(path.read_text())
-            if not isinstance(current, dict) or current.get('session_id') != meta['session_id']:
+            current = clean_snapshot(json.loads(path.read_text()))
+            if not current or current.get('session_id') != meta['session_id'] or current.get('provider') != provider:
                 current = None
         except FileNotFoundError:
             current = None
@@ -257,7 +298,7 @@ def read_sessions(state_dir=DEFAULT_STATE_DIR, provider=None):
             if path.is_symlink() or not path.is_file():
                 continue
             try:
-                value = json.loads(path.read_text())
+                value = clean_snapshot(json.loads(path.read_text()))
             except (OSError, ValueError):
                 continue
             if _valid_snapshot(value, name) and path == _session_file(state_dir, name, value['session_id']):
@@ -341,25 +382,72 @@ def agent_signal(agent, provider, state_dir=DEFAULT_STATE_DIR, now=None, session
     return base
 
 
-def prune(state_dir=DEFAULT_STATE_DIR, now=None, max_age=14 * 24 * 3600):
-    """Delete snapshots whose last event is older than max_age. Returns the count."""
+def retention_review(state_dir=DEFAULT_STATE_DIR, now=None, max_age=14 * 24 * 3600):
+    """Read-only sorting of session files. Only a valid snapshot under its own name can ever expire.
+
+    A file that is malformed, foreign, a symlink or dated in the future is kept and reported, because
+    it cannot be shown to be an old session of ours. Age exactly at the limit is kept.
+    """
     now = time.time() if now is None else now
-    removed = 0
-    for provider in PROVIDERS:
-        folder = Path(state_dir) / provider
-        if not folder.is_dir():
+    review = {'kept': 0, 'expired': [], 'unknown': []}
+    root = Path(state_dir)
+    for provider in sorted(PROVIDERS):
+        folder = root / provider
+        if folder.is_symlink() or not folder.is_dir():
             continue
-        with _Lock(folder / '.lock'):
-            for path in folder.glob('*.json'):
+        for path in sorted(folder.glob('*.json')):
+            row = {'provider': provider, 'file': path.name}
+            if path.is_symlink() or not path.is_file():
+                review['unknown'].append({**row, 'reason': 'not_a_regular_file'})
+                continue
+            try:
+                value = clean_snapshot(json.loads(path.read_text()))
+            except (OSError, ValueError):
+                review['unknown'].append({**row, 'reason': 'unreadable'})
+                continue
+            if not value or not _valid_snapshot(value, provider) or path != _session_file(root, provider, value['session_id']):
+                review['unknown'].append({**row, 'reason': 'foreign'})
+            elif value['last_event_at'] > now:
+                review['unknown'].append({**row, 'reason': 'dated_in_future'})
+            elif now - value['last_event_at'] > max_age:
+                review['expired'].append({**row, 'last_event_at': value['last_event_at']})
+            else:
+                review['kept'] += 1
+    return review
+
+
+def remove_expired(state_dir, rows, now, max_age):
+    """Delete the listed files only if they are, under the lock, still the same expired sessions."""
+    root = Path(state_dir)
+    removed, skipped = [], []
+    for row in rows:
+        folder = root / row['provider']
+        path = folder / row['file']
+        try:
+            with _Lock(folder / '.lock'):
                 try:
-                    value = json.loads(path.read_text())
-                    stale = not _valid_snapshot(value, provider) or now - value['last_event_at'] > max_age
+                    value = None if path.is_symlink() else clean_snapshot(json.loads(path.read_text()))
                 except (OSError, ValueError):
-                    stale = True
-                if stale and not path.is_symlink():
-                    path.unlink(missing_ok=True)
-                    removed += 1
-    return removed
+                    value = None
+                if (value and _valid_snapshot(value, row['provider']) and value['last_event_at'] == row['last_event_at']
+                        and path == _session_file(root, row['provider'], value['session_id']) and now - value['last_event_at'] > max_age):
+                    path.unlink()
+                    removed.append(row)
+                else:
+                    skipped.append({**row, 'reason': 'changed_since_review'})
+        except OSError:  # one file must not lose the record of the others
+            skipped.append({**row, 'reason': 'could_not_remove'})
+    return removed, skipped
+
+
+def prune(state_dir=DEFAULT_STATE_DIR, now=None, max_age=14 * 24 * 3600):
+    """Delete expired session snapshots; malformed or foreign files stay. Returns the count.
+
+    Nothing in production calls this; see `agentops retention`, whose default only plans.
+    """
+    now = time.time() if now is None else now
+    removed, _ = remove_expired(state_dir, retention_review(state_dir, now, max_age)['expired'], now, max_age)
+    return len(removed)
 
 
 # ---------------------------------------------------------------- install plan
