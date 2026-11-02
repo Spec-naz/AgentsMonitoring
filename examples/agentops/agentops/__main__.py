@@ -3,6 +3,7 @@ from decimal import Decimal, InvalidOperation
 import json
 import os
 from pathlib import Path
+import sqlite3
 import sys
 
 from . import __version__
@@ -110,6 +111,21 @@ def main():
     applied.add_argument('--signals-dir', type=Path, required=True)
     applied.add_argument('--plan-sha256', required=True)
     applied.add_argument('--output', type=Path, required=True)
+    package = commands.add_parser('package', help='Versioned work packages; builds and checks files, runs nothing')
+    package_steps = package.add_subparsers(dest='step', required=True)
+    built = package_steps.add_parser('build', help='Add real hashes and sizes to a draft; never overwrites')
+    built.add_argument('--draft', type=Path, required=True)
+    built.add_argument('--output', type=Path, required=True)
+    built.add_argument('--base', type=Path, help='Folder for relative source paths in the draft')
+    checked = package_steps.add_parser('check', help='Is it usable now? Returns 2 when not')
+    checked.add_argument('file', type=Path)
+    checked.add_argument('--with-task', action='store_true', help='Also compare with the task in the ledger')
+    rendered = package_steps.add_parser('render', help='Print the text a worker gets')
+    rendered.add_argument('file', type=Path)
+    compared = package_steps.add_parser('compare', help='Volume against a broad context; no model is run')
+    compared.add_argument('file', type=Path)
+    compared.add_argument('--broad', type=Path, nargs='+', required=True)
+    compared.add_argument('--facts', type=Path)
     queue = commands.add_parser('queue', help='Read-only list of what waits for a decision, repair, review or takeover')
     queue.add_argument('--owner-actor', default='michal')
     queue.add_argument('--for', dest='waiting_on')
@@ -142,6 +158,29 @@ def main():
         except OSError:  # paths can hold anything, so these commands never print raw file errors
             raise ValueError('A file for this command could not be read or written') from None
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+    if args.command == 'package':
+        from . import regression, work_package as wp
+        try:
+            if args.step == 'build':
+                result = wp.build(regression.read_document(args.draft), args.base)
+                regression.write_report(args.output, result)
+                print(json.dumps(wp.check(result), ensure_ascii=False, indent=2))
+                return
+            document = wp.load_package(args.file)
+            if args.step == 'render':
+                sys.stdout.write(wp.render(document))
+                return
+            if args.step == 'compare':
+                facts = regression.read_document(args.facts) if args.facts else None
+                print(json.dumps(wp.compare(document, args.broad, facts), ensure_ascii=False, indent=2))
+                return
+            result = wp.check(document, args.db if args.with_task else None)
+        except (OSError, sqlite3.Error):  # a path can hold anything, so no raw file error reaches the output
+            raise ValueError('A file for this command could not be read or written') from None
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        if not result['ready']:
+            raise SystemExit(2)
         return
     if args.command == 'verify':
         from . import postcheck, regression

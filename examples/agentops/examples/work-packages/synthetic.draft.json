@@ -1,0 +1,56 @@
+{
+  "schema": "agentops-work-package-draft-v1",
+  "package_id": "ukazka",
+  "version": 1,
+  "task": {
+    "task_id": "00000000-0000-4000-8000-000000000001"
+  },
+  "goal": "Ověřit na syntetickém podkladu, že prahová hodnota odpovídá.",
+  "roles": {
+    "owner": "autor",
+    "reviewer": "kontrolor"
+  },
+  "financial": {
+    "scope": "Jen již schválené předplatné.",
+    "new_paid_usage": false,
+    "on_limit": "stop_and_report"
+  },
+  "constraints": [
+    {
+      "id": "bez-nasazeni",
+      "text": "Nic nenasazuj."
+    }
+  ],
+  "sources": [
+    {
+      "id": "podklad",
+      "path": "README-source.md",
+      "origin": {
+        "kind": "synthetic",
+        "ref": "examples/work-packages"
+      },
+      "why": "Obsahuje prahovou hodnotu.",
+      "load": "required",
+      "lines": [
+        5,
+        5
+      ]
+    }
+  ],
+  "output": {
+    "description": "Krátká zpráva s výsledkem.",
+    "location": "výstup úkolu"
+  },
+  "done_when": [
+    {
+      "id": "hodnota",
+      "text": "Hodnota je potvrzena.",
+      "evidence": "citace řádku z podkladu"
+    }
+  ],
+  "out_of_scope": [
+    "Změny podkladu."
+  ],
+  "open_questions": [],
+  "budget_bytes": 8192
+}
