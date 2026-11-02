@@ -142,6 +142,11 @@ and deletes nothing. See [metadata policy](docs/metadata-policy.md).
 `agentops package` builds and checks a small file that gives one worker what the task needs, instead of the whole team
 history. See [work packages](docs/work-packages.md).
 
+### Preparing a takeover
+
+`agentops brief TASK --for ACTOR` says what to read first and which revision to use, and where the routine stops. Exit 0 means nothing
+to do, 10 start an agent, 20 a person, 30 unknown. It reads only. See [routines](docs/routines.md).
+
 ### Offline regression cases
 
 `agentops regress template/run/compare` evaluates explicit synthetic observations and
