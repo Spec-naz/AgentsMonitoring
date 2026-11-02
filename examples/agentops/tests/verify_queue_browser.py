@@ -50,6 +50,8 @@ with tempfile.TemporaryDirectory() as tmp:
     ledger.change(checked, 'autor', 'start')
     ledger.record_postcheck(checked, 'autor', 'fail', '/dukazy/report-1.json', 'a' * 64)
     ledger.change(checked, 'autor', 'offer', target='kontrolor', purpose='review', artifact='/vystup-2.md')
+    ledger.record_run_event({'task_id': checked, 'run_id': '11111111-1111-4111-8111-111111111111', 'parent_id': None, 'at': 5.0, 'source': 'operator',
+                             'evidence': 'declared', 'actor': 'autor', 'action': 'start', 'outcome': 'unknown', 'error_code': None, 'usage_tokens': None})
     queue = build(ledger)
     ledger.close()
 
@@ -93,7 +95,7 @@ server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 VISIBLE = ['Rozhodnutí: michal', 'Oprava po kontrole', 'moznosti.md', 'required-fixes-s-dlouhym-nazvem.md',
            'Stažené předání, důvod:', 'report-1.json', 'fail', 'Kontrola nezávisle, ne autor',
-           '4 úkoly · 3 k pozornosti', 'Odkaz ke kopírování']
+           '4 úkoly · 3 k pozornosti', 'Odkaz ke kopírování', 'Běhy: 1, nejasné: 1, spotřeba neznámá u 1']
 TASKS, ATTENTION = 4, 3
 
 

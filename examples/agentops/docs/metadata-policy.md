@@ -14,7 +14,7 @@ and error text are not stored by default. There is no switch that turns them on.
 | Provider session | `provider-signals/<provider>/<hash>.json` | `SNAPSHOT_FIELDS` in `provider_signals.py`; reading drops anything else | auxiliary, can expire |
 | Rejection counters | `provider-signals/rejected.json` | Fixed reasons and counts; one bounded file | auxiliary, kept |
 | Dashboard snapshot | `snapshot.json` | Overwritten each run. **Holds declared text:** titles, block reasons, output paths | auxiliary, replaced |
-| Ledger | `tasks.sqlite` | Tasks and events, append-only. **Holds declared text:** titles, notes, paths | critical, never expires |
+| Ledger | `tasks.sqlite` | Tasks, events and run events, append-only. **Holds declared text:** titles, notes, paths | critical, never expires |
 | Result check and regression reports | path chosen by the caller | Paths, hashes, names of unexpected files, effect notes; no file content | critical evidence, never expires |
 | Backups | path chosen by the caller | Selected files and the ledger; excludes are filename-based | out of scope, unchanged |
 
@@ -82,7 +82,7 @@ unchanged here. It is kept out of new telemetry and exports, not scanned.
 | `micros` | Sum of recorded entries only. |
 | `records` | How many entries; everything else is unknown, not zero. |
 
-### Run event (contract for LC-02; nothing writes it yet) (`run_event`)
+### Run event (written by `agentops run-event`) (`run_event`)
 
 | Field | Purpose |
 |---|---|

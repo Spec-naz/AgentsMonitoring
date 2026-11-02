@@ -8,6 +8,7 @@ import json
 import time
 
 from .ledger import actor
+from .timeline import run_summary
 
 CATEGORIES = ('owner_decision', 'rework', 'peer_review', 'takeover', 'blocked')
 MAX_ROWS = 200
@@ -94,7 +95,8 @@ def build(ledger, owner_actor='michal', now=None, waiting_on=None):
             # The ledger refuses done by the producer; shown so nobody plans a review that cannot count.
             'reviewer_must_not_be': task['producer'] if category == 'peer_review' else None,
             'postcheck': check, 'postcheck_blocks_done': bool(check) and check['verdict'] != 'pass',
-            'timeline': 'agentops history ' + task['id']})
+            'runs': run_summary(ledger, task['id']),
+            'timeline': 'agentops timeline ' + task['id']})
     rows.sort(key=lambda row: (CATEGORIES.index(row['category']), -row['waiting_seconds']))
     counts = {name: sum(row['category'] == name for row in rows) for name in CATEGORIES}
     return {'generated_at': now, 'owner_actor': owner_actor, 'counts': counts, 'rows': rows[:MAX_ROWS],

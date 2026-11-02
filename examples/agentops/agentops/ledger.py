@@ -61,6 +61,14 @@ class Ledger:
             BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
           CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
             BEGIN SELECT RAISE(ABORT,'Audit events are append-only'); END;
+          CREATE TABLE IF NOT EXISTS run_events(
+            seq INTEGER PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id), run_id TEXT NOT NULL, parent_id TEXT,
+            at REAL NOT NULL, source TEXT NOT NULL, evidence TEXT NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL,
+            outcome TEXT NOT NULL, error_code TEXT, usage_tokens INTEGER);
+          CREATE TRIGGER IF NOT EXISTS run_events_no_update BEFORE UPDATE ON run_events
+            BEGIN SELECT RAISE(ABORT,'Run events are append-only'); END;
+          CREATE TRIGGER IF NOT EXISTS run_events_no_delete BEFORE DELETE ON run_events
+            BEGIN SELECT RAISE(ABORT,'Run events are append-only'); END;
           CREATE TABLE IF NOT EXISTS commands(
             request_id TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, result TEXT NOT NULL);
           CREATE TABLE IF NOT EXISTS costs(
@@ -176,6 +184,45 @@ class Ledger:
                                              'changes': changes, **{k: v for k, v in payload.items() if v is not None}})
             return self.get(task_id)
         return self._command(payload, request_id, work)
+
+    def _check_run_identity(self, record):
+        """A run is one execution of one task, started by one parent. It cannot lead back to itself.
+
+        A parent not recorded yet is allowed. The checks run against what is stored, inside the write.
+        """
+        run_id, parent = record['run_id'], record['parent_id']
+        if parent == run_id:
+            raise Conflict('A run cannot be its own parent')
+        rows = self.db.execute('SELECT task_id,parent_id FROM run_events WHERE run_id=?', (run_id,)).fetchall()
+        if any(row['task_id'] != record['task_id'] for row in rows):
+            raise Conflict('This run belongs to another task')
+        if any(row['parent_id'] != parent for row in rows):
+            raise Conflict('A run cannot change its parent')
+        seen, current = {run_id}, parent
+        while current is not None:
+            if current in seen:
+                raise Conflict('This parent would make a run lead back to itself')
+            seen.add(current)
+            row = self.db.execute('SELECT parent_id FROM run_events WHERE run_id=? ORDER BY seq LIMIT 1', (current,)).fetchone()
+            current = row['parent_id'] if row else None
+
+    def record_run_event(self, record, request_id=None, generated=()):
+        """One step of a concrete run, by the allowlisted run_event contract. It changes no task state.
+
+        Fields named in `generated` were made up by the caller for this attempt, such as the time. They stay out of
+        the request fingerprint, so repeating a request returns the original event instead of failing.
+        """
+        from .metadata import validate_record
+        validate_record('run_event', record)
+        def work():
+            self.get(record['task_id'])
+            self._check_run_identity(record)
+            cursor = self.db.execute('INSERT INTO run_events(task_id,run_id,parent_id,at,source,evidence,actor,action,outcome,error_code,usage_tokens) '
+                                     'VALUES(?,?,?,?,?,?,?,?,?,?,?)', tuple(record[key] for key in (
+                                         'task_id', 'run_id', 'parent_id', 'at', 'source', 'evidence', 'actor', 'action', 'outcome', 'error_code', 'usage_tokens')))
+            return {**record, 'seq': cursor.lastrowid}
+        fingerprint = {key: value for key, value in record.items() if key not in generated}
+        return self._command({'op': 'run_event', **fingerprint}, request_id, work)
 
     def latest_postcheck(self, task_id):
         """The newest recorded result check of this task, or None. Tasks without a check are not affected."""

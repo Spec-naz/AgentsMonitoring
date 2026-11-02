@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.10 — 2026-11-02
+
+- Add `agentops timeline` (LC-02): one read-only history of a task from the ledger and run events, with what each entry rests on,
+  problems on record, runs with their parents, known and unknown usage, and an assigned, stale or missing provider signal.
+- Add `agentops run-event` and an append-only `run_events` table in the same ledger, using the LC-07 contract. The metadata export includes it.
+- The queue links the timeline and shows runs as an evidence row.
+- A run belongs to one task and one parent; the writer refuses contradictions, and records past the rules read as invalid. Repeating a request id returns the original event.
 ## 0.2.9 — 2026-11-02
 
 - Add `agentops brief` (LC-08): a read-only, rule-based preparation of one task's start, with a linked output check and a defined

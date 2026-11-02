@@ -137,6 +137,10 @@ can be copied from Connection details. Local files cannot be opened from the das
 `agentops metadata-export` writes allowlisted metadata only, and `agentops retention plan` reports what could expire
 and deletes nothing. See [metadata policy](docs/metadata-policy.md).
 
+### Task timeline
+
+`agentops timeline TASK` shows who did what and when, on what evidence, and where a problem is on record. See
+[timeline](docs/timeline.md).
 ### Work packages
 
 `agentops package` builds and checks a small file that gives one worker what the task needs, instead of the whole team

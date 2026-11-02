@@ -38,6 +38,11 @@ def _references(row):
         found.append((f"{how}, důvod: {row['blocked_reason']}", row['blocked_reason']))
     if row.get('artifact') and row['artifact'] != (returned or {}).get('reason_artifact'):
         found.append((f"Výstup: {_short(row['artifact'])}", row['artifact']))
+    runs = row.get('runs') or {}
+    if runs.get('runs'):
+        unclear = f", nejasné: {runs['unclear']}" if runs.get('unclear') else ''
+        usage = f", spotřeba neznámá u {runs['unknown_usage']}" if runs.get('unknown_usage') else ''
+        found.append((f"Běhy: {runs['runs']}{unclear}{usage}", row.get('timeline')))
     if row.get('reviewer_must_not_be'):
         found.append((f"Kontrola nezávisle, ne {row['reviewer_must_not_be']}", None))
     return found
@@ -64,7 +69,7 @@ def queue_table(queue):
             break
         shown += 1
         detail = _plain(f"Čeká na: {row['waiting_on']}. Průběh: {row['timeline']}.", 500)
-        needs_look = row['category'] in ('owner_decision', 'blocked') or row.get('postcheck_blocks_done')
+        needs_look = row['category'] in ('owner_decision', 'blocked') or row.get('postcheck_blocks_done') or (row.get('runs') or {}).get('unclear')
         attention += bool(needs_look)
         rows.append(_queue_row('q-' + row['id'], row['title'], 'workflow-attention' if needs_look else 'workflow-task',
                                label=_plain(row['waiting_on'], 240),
